@@ -13,6 +13,7 @@ class SKFilter
   float post_scale_ = 1;
   int mode_ = 0;
   int over_ = 1;
+  float freq_warp_factor_ = 0;
 
   struct Channel
   {
@@ -33,6 +34,7 @@ public:
         channel.res_up   = std::make_unique<Resampler2> (Resampler2::UP, over_, Resampler2::PREC_72DB, false, Resampler2::FILTER_IIR);
         channel.res_down = std::make_unique<Resampler2> (Resampler2::DOWN, over_, Resampler2::PREC_72DB, false, Resampler2::FILTER_IIR);
       }
+    set_rate (48000);
   }
   void
   set_scale (float pre, float post)
@@ -57,11 +59,31 @@ public:
         channel.s2 = 0;
       }
   }
+  void
+  set_rate (float rate)
+  {
+    freq_warp_factor_ = 4 / (rate * over_);
+  }
+private:
+  float
+  cutoff_warp (float freq)
+  {
+    float x = freq * freq_warp_factor_;
+
+    /* approximate tan (pi*x/4) for cutoff warping */
+    const float c1 = -3.16783027;
+    const float c2 =  0.134516124;
+    const float c3 = -4.033321984;
+
+    float x2 = x * x;
+
+    return x * (c1 + c2 * x2) / (c3 + x2);
+  }
   template<int MODE, bool STEREO>
   void
   process (float *left, float *right, float freq)
   {
-    float g = freq / (48000 * over_) * M_PI; // FIXME: warping, clamp
+    float g = cutoff_warp (freq); // FIXME: clamp freq
     float G = g / (1 + g);
 
     float xnorm = 1.f / (1 - k_ * G + k_ * G * G);
@@ -177,6 +199,7 @@ public:
     if (right)
       channels_[1].res_down->process_block (over_samples_right, n_samples * over_, right);
   }
+public:
   void
   process_block (uint n_samples, float *left, float *right, float *freq_in)
   {

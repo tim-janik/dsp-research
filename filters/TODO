@@ -8,8 +8,6 @@
   void tick (float *l, float *r, float freq, float reso, float drive, float mix);
   void process_block (float *l, float *r, uint n_values);
 
-- don't hard code sample rate
-- cutoff warping
 - resonance normalization
 - multiple modes
   LP1..4, HP1..4, BP2/4, NOTCH
