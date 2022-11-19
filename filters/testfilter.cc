@@ -6,6 +6,23 @@
 #include <string>
 
 using std::string;
+using std::vector;
+
+static inline float
+db_from_complex (float re, float im, float min_dB)
+{
+  float abs2 = re * re + im * im;
+
+  if (abs2 > 0)
+    {
+      constexpr float log2_db_factor = 3.01029995663981; // 10 / log2 (10)
+
+      // glibc log2f is a lot faster than glibc log10
+      return log2f (abs2) * log2_db_factor;
+    }
+  else
+    return min_dB;
+}
 
 inline double
 get_time()
@@ -15,6 +32,43 @@ get_time()
   gettimeofday (&tv, 0);
 
   return tv.tv_sec + tv.tv_usec / 1000000.0;
+}
+
+vector<float>
+gen()
+{
+  vector<float> samples;
+  double phase = 0;
+  double l = 48000 * 5;
+  double factor = pow (24000 / 20., (1./l));
+  double vol = 0;
+  for (double f = 20; f < 24000; f *= factor)
+    {
+      samples.push_back (sin (phase) * vol);
+      samples.push_back (cos (phase) * vol);
+      phase += f / 48000 * 2 * M_PI;
+      vol += 1. / 500; /* avoid click at start */
+      if (vol > 1)
+        vol = 1;
+    }
+  return samples;
+}
+
+void
+test (const vector<float>& samples)
+{
+  double l = 48000 * 5;
+  double factor = pow (24000 / 20., (1./l));
+  size_t i = 0;
+  for (double f = 20; f < 24000; f *= factor)
+    {
+      i++;
+      if (i > 500 && i * 2 < samples.size())
+        {
+          printf ("%f %f\n", f, db_from_complex (samples[i * 2], samples[i * 2 + 1], -144));
+          // printf ("%f\n", samples[i * 2]);
+        }
+    }
 }
 
 int
@@ -55,5 +109,37 @@ main (int argc, char **argv)
       printf ("# ns/sample %f\n",  ns_per_sample);
       printf ("# bogopolyphony = %f\n", 1e9 / (ns_per_sample * 48000));
     }
+  if (argc == 6 && cmd == "sweep")
+    {
+      vector<float> left;
+      vector<float> right;
+      vector<float> freq;
+      vector<float> samples = gen();
 
+      const float xfreq = atof (argv[2]);
+      for (size_t i = 0; i < samples.size() / 2; i++)
+        {
+          left.push_back (samples[i * 2]);
+          right.push_back (samples[i * 2 + 1]);
+          freq.push_back (xfreq);
+        }
+
+      SKFilter filter (atoi (argv[3]));
+
+      /* test how the filter behaves as a linear filter (without distortion) */
+      float pre_scale = 0.001;
+      filter.set_scale (pre_scale, 1 / pre_scale);
+
+      filter.set_params (atoi (argv[4]), atof (argv[5]));
+      filter.process_block (left.size(), left.data(), right.data(), freq.data());
+
+      vector<float> out;
+      for (size_t i = 0; i < left.size(); i++)
+        {
+          out.push_back (left[i]);
+          out.push_back (right[i]);
+        }
+
+      test (out);
+    }
 }
