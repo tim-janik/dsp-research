@@ -83,10 +83,10 @@ main (int argc, char **argv)
 
   string cmd = argv[1];
 
-  if (argc == 2 && cmd == "perf")
+  if (argc == 3 && cmd == "perf")
     {
       SKFilter filter (/* oversample */ 4);
-      filter.set_params (0, 0.95);
+      filter.set_params (atoi (argv[2]), 0.95);
 
       const int block_size = 512;
       float left[block_size], right[block_size], freq[block_size];
