@@ -1,0 +1,27 @@
+- match laddervcf API
+
+  void set_freq() / set_freq_in()
+  void set_reso() / set_reso_in()
+  void set_drive() / set_drive_in()
+  void set_mix() / set_mix_in()
+
+  void tick (float *l, float *r, float freq, float reso, float drive, float mix);
+  void process_block (float *l, float *r, uint n_values);
+
+- resonance normalization?
+- freq/reso normalization?
+- multiple modes
+  ~ NOTCH
+  ~ possibly: HP3 LP3 LP6|8 HP6|8 BP6|8
+  ~ mode API should have enum
+  ~ 2nd order filters should only have one non-linearity
+- compare to / check in laddervcf.hh
+- normalize non-linearity output to [-1:1]
+- allow reso > 1 for slightly unstable filter
+- prescale should be reduced for increased reso
+  ~ make reso more audible for drive == 0dB
+- change drive range to 0..8 & x^3
+- support fast resonance changes (resonance tables for HP4|LP4)
+- test integration in SpectMorph
+- possibly use tanh approximation
+- possibly use SIMD instructions
