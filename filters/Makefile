@@ -3,4 +3,4 @@ LDLIBS = $(shell pkg-config --libs fftw3f)
 
 all: testfilter
 
-testfilter: testfilter.cc skfilter.hh
+testfilter: testfilter.cc

@@ -1,6 +1,7 @@
 // This Source Code Form is licensed MPL-2.0: http://mozilla.org/MPL/2.0
 
 #include "skfilter.hh"
+#include "laddervcf.hh"
 
 #include <sys/time.h>
 #include <string>
@@ -187,6 +188,41 @@ main (int argc, char **argv)
       filter2.set_params (atoi (argv[4]), 1 - R2);
       filter.process_block (left.size(), left.data(), right.data(), freq.data());
       filter2.process_block (left.size(), left.data(), right.data(), freq.data());
+
+      vector<float> out;
+      for (size_t i = 0; i < left.size(); i++)
+        {
+          out.push_back (left[i]);
+          out.push_back (right[i]);
+        }
+
+      test (out);
+    }
+  if (argc == 5 && cmd == "ldsweep")
+    {
+      vector<float> left;
+      vector<float> right;
+      vector<float> freq;
+      vector<float> samples = gen();
+
+      const float xfreq = atof (argv[2]);
+      for (size_t i = 0; i < samples.size() / 2; i++)
+        {
+          left.push_back (samples[i * 2]);
+          right.push_back (samples[i * 2 + 1]);
+          freq.push_back (xfreq);
+        }
+
+      SpectMorph::LadderVCFNonLinear filter;
+      filter.set_mode (SpectMorph::LadderVCFMode (atoi (argv[3])));
+
+      /* test how the filter behaves as a linear filter (without distortion) */
+      float pre_scale = 0.001;
+      filter.set_scale (pre_scale, 1 / pre_scale);
+
+      const float *inputs[2] = { left.data(), right.data() };
+      float *outputs[2] = { left.data(), right.data() };
+      filter.run_block (left.size(), 0, atof (argv[4]), inputs, outputs, true, true, freq.data(), nullptr);
 
       vector<float> out;
       for (size_t i = 0; i < left.size(); i++)
