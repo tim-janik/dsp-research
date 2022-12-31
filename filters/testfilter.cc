@@ -6,6 +6,7 @@
 #include <sys/time.h>
 #include <string>
 #include <complex>
+#include <iostream>
 
 using std::string;
 using std::vector;
@@ -144,7 +145,7 @@ main (int argc, char **argv)
 
       test (out);
     }
-  if (argc == 6 && cmd == "4pole")
+  if (argc == 6 && cmd == "4pole") // <freq> <over> <mode> <res>
     {
       // roots of 4th order butterworth in s, left semi-plane
       double sq2inv = 1 / sqrt (2);
@@ -161,6 +162,7 @@ main (int argc, char **argv)
 
       auto R1 = -r1res.real();
       auto R2 = -r2res.real();
+      printf ("R %f %f %f\n", atof (argv[5]), R1, R2);
       printf ("# HH(s)=1/((s*s+2*s*%f+1)*(s*s+2*s*%f+1))\n", R1, R2);
 
       vector<float> left;
@@ -232,5 +234,41 @@ main (int argc, char **argv)
         }
 
       test (out);
+    }
+  if (argc == 4 && cmd == "roots") // <order> <res>
+    {
+      int order = atoi (argv[2]);
+      vector<std::complex<double>> rs;
+      for (int i = 0; i < order / 2; i++)
+        {
+          double alpha = M_PI * (4 * i + order + 2) / (2 * order);
+          rs.push_back ({ cos (alpha), sin (alpha)});
+        }
+      // R must be in interval [0:1]
+      double R = 1 - atof (argv[3]);
+      double alpha = std::acos (R);
+      alpha /= order / 2;
+
+      auto j = std::complex<double> {0, 1};
+      // roots with resonance
+      vector<double> Rn;
+      for (auto root : rs)
+        {
+          std::complex<double> rres = root * std::exp (j * alpha);
+          Rn.push_back (-rres.real());
+        }
+      std::sort (Rn.begin(), Rn.end(), std::greater<double>());
+      printf ("H%d(s)=1/(", order);
+      for (size_t i = 0; i < Rn.size(); i++)
+        {
+          if (i)
+            printf ("*");
+          printf ("(s*s+2*s*%.17g+1)", Rn[i]);
+        }
+      printf (")\n");
+      for (size_t i = 0; i < Rn.size(); i++)
+        {
+          printf ("H%d_%zd(s)=1/(s*s+2*s*%.17g+1)\n", order, i, Rn[i]);
+        }
     }
 }
