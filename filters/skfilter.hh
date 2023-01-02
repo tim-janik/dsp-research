@@ -253,28 +253,24 @@ private:
     if (right)
       channels_[1].res_down->process_block (over_samples_right, n_samples * over_, right);
   }
+
+  using ProcessBlockFunc = decltype (&SKFilter::process_block_mode<0>);
+  static constexpr size_t LAST_MODE = 7;
+
+  template<size_t... INDICES>
+  static constexpr std::array<ProcessBlockFunc, LAST_MODE + 1>
+  make_jump_table (std::integer_sequence<size_t, INDICES...>)
+  {
+    auto mk_func = [] (auto I) { return &SKFilter::process_block_mode<I.value>; };
+
+    return { mk_func (std::integral_constant<int, INDICES>{})... };
+  }
 public:
   void
   process_block (uint n_samples, float *left, float *right, float *freq_in)
   {
-    switch (mode_)
-      {
-        case 0: process_block_mode<0> (n_samples, left, right, freq_in);
-                break;
-        case 1: process_block_mode<1> (n_samples, left, right, freq_in);
-                break;
-        case 2: process_block_mode<2> (n_samples, left, right, freq_in);
-                break;
-        case 3: process_block_mode<3> (n_samples, left, right, freq_in);
-                break;
-        case 4: process_block_mode<4> (n_samples, left, right, freq_in);
-                break;
-        case 5: process_block_mode<5> (n_samples, left, right, freq_in);
-                break;
-        case 6: process_block_mode<6> (n_samples, left, right, freq_in);
-                break;
-        case 7: process_block_mode<7> (n_samples, left, right, freq_in);
-                break;
-      }
+    static constexpr auto jump_table { make_jump_table (std::make_index_sequence<LAST_MODE + 1>()) };
+
+    (this->*jump_table[mode_]) (n_samples, left, right, freq_in);
   }
 };
