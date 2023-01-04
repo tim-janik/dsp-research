@@ -3,7 +3,6 @@
 #define PANDA_RESAMPLER_HEADER_ONLY
 #include "pandaresampler.hh"
 #include <algorithm>
-#include <complex>
 
 using PandaResampler::Resampler2;
 
@@ -55,25 +54,19 @@ class SKFilter
             {
               double res = std::clamp (double (t) / TSIZE, 0.0, 1.0);
 
-              std::vector<std::complex<double>> rs;
+              // R must be in interval [0:1]
+              const double R = 1 - res;
+              const double r_alpha = std::acos (R) / (order / 2);
+
+              std::vector<double> Rn;
               for (int i = 0; i < order / 2; i++)
                 {
-                  double alpha = M_PI * (4 * i + order + 2) / (2 * order);
-                  rs.push_back ({ cos (alpha), sin (alpha)});
+                  /* butterworth roots in s, left semi plane */
+                  const double bw_s_alpha = M_PI * (4 * i + order + 2) / (2 * order);
+                  /* add resonance */
+                  Rn.push_back (-cos (bw_s_alpha + r_alpha));
                 }
-              // R must be in interval [0:1]
-              double R = 1 - res;
-              double alpha = std::acos (R);
-              alpha /= order / 2;
 
-              auto j = std::complex<double> {0, 1};
-              // roots with resonance
-              std::vector<double> Rn;
-              for (auto root : rs)
-                {
-                  std::complex<double> rres = root * std::exp (j * alpha);
-                  Rn.push_back (-rres.real());
-                }
               std::sort (Rn.begin(), Rn.end(), std::greater<double>());
 
               for (auto xr : Rn)

@@ -238,26 +238,22 @@ main (int argc, char **argv)
   if (argc == 4 && cmd == "roots") // <order> <res>
     {
       int order = atoi (argv[2]);
-      vector<std::complex<double>> rs;
+
+      // R must be in interval [0:1]
+      const double R = 1 - atof (argv[3]);
+      const double r_alpha = std::acos (R) / (order / 2);
+
+      vector<double> Rn;
       for (int i = 0; i < order / 2; i++)
         {
-          double alpha = M_PI * (4 * i + order + 2) / (2 * order);
-          rs.push_back ({ cos (alpha), sin (alpha)});
+          /* butterworth roots in s, left semi plane */
+          const double bw_s_alpha = M_PI * (4 * i + order + 2) / (2 * order);
+          /* add resonance */
+          Rn.push_back (-cos (bw_s_alpha + r_alpha));
         }
-      // R must be in interval [0:1]
-      double R = 1 - atof (argv[3]);
-      double alpha = std::acos (R);
-      alpha /= order / 2;
 
-      auto j = std::complex<double> {0, 1};
-      // roots with resonance
-      vector<double> Rn;
-      for (auto root : rs)
-        {
-          std::complex<double> rres = root * std::exp (j * alpha);
-          Rn.push_back (-rres.real());
-        }
       std::sort (Rn.begin(), Rn.end(), std::greater<double>());
+
       printf ("H%d(s)=1/(", order);
       for (size_t i = 0; i < Rn.size(); i++)
         {
