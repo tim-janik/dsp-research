@@ -1,6 +1,11 @@
-CXXFLAGS = -O2 -ffast-math -Wall -g -I /home/stefan/src/pandaresampler/lib $(shell pkg-config --cflags fftw3f)
-LDLIBS = $(shell pkg-config --libs fftw3f)
+CXXFLAGS = -O2 -ffast-math -Wall -g -I /home/stefan/src/pandaresampler/lib
 
 all: testfilter
 
-testfilter: testfilter.cc
+testfilter.o: testfilter.cc skfilter.hh laddervcf.hh
+
+testfilter: testfilter.o
+	$(CXX) -o testfilter testfilter.o $(LDFLAGS)
+
+clean:
+	rm -f testfilter testfilter.o

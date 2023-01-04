@@ -15,7 +15,7 @@ class SKFilter
   int over_ = 1;
   float freq_warp_factor_ = 0;
 
-  static constexpr int MAX_STAGES = 2;
+  static constexpr int MAX_STAGES = 3;
 
   struct Channel
   {
@@ -30,7 +30,9 @@ class SKFilter
   static constexpr int
   mode2stages (int mode)
   {
-    if (mode > 4)
+    if (mode > 7)
+      return 3;
+    else if (mode > 4)
       return 2;
     else
       return 1;
@@ -38,9 +40,85 @@ class SKFilter
 
   std::array<Channel, 2> channels_;
 
+  class RTable {
+    std::vector<float> res2_k;
+    std::vector<float> res3_k;
+    static constexpr int TSIZE = 16;
+    RTable()
+    {
+      for (int order = 4; order <= 6; order += 2)
+        {
+          for (int t = 0; t <= TSIZE + 1; t++)
+            {
+              double res = std::clamp (double (t) / TSIZE, 0.0, 1.0);
+
+              std::vector<std::complex<double>> rs;
+              for (int i = 0; i < order / 2; i++)
+                {
+                  double alpha = M_PI * (4 * i + order + 2) / (2 * order);
+                  rs.push_back ({ cos (alpha), sin (alpha)});
+                }
+              // R must be in interval [0:1]
+              double R = 1 - res;
+              double alpha = std::acos (R);
+              alpha /= order / 2;
+
+              auto j = std::complex<double> {0, 1};
+              // roots with resonance
+              std::vector<double> Rn;
+              for (auto root : rs)
+                {
+                  std::complex<double> rres = root * std::exp (j * alpha);
+                  Rn.push_back (-rres.real());
+                }
+              std::sort (Rn.begin(), Rn.end(), std::greater<double>());
+
+              for (auto xr : Rn)
+                {
+                  if (order == 4)
+                    res2_k.push_back ((1 - xr) * 2);
+                  if (order == 6)
+                    res3_k.push_back ((1 - xr) * 2);
+                }
+            }
+        }
+    }
+  public:
+    static const RTable&
+    the()
+    {
+      static RTable rtable;
+      return rtable;
+    }
+    void
+    lookup_resonance (float res, int stages, float *k) const
+    {
+      auto lerp = [] (float a, float b, float frac) {
+        return a + frac * (b - a);
+      };
+
+      float fidx = std::clamp (res, 0.f, 1.f) * TSIZE;
+      int idx = fidx;
+      float frac = fidx - idx;
+
+      if (stages == 2)
+        {
+          k[0] = lerp (res2_k[idx * 2], res2_k[idx * 2 + 2], frac);
+          k[1] = lerp (res2_k[idx * 2 + 1], res2_k[idx * 2 + 3], frac);
+        }
+      else if (stages == 3)
+        {
+          k[0] = lerp (res3_k[idx * 3],     res3_k[idx * 3 + 3], frac);
+          k[1] = lerp (res3_k[idx * 3 + 1], res3_k[idx * 3 + 4], frac);
+          k[2] = lerp (res3_k[idx * 3 + 2], res3_k[idx * 3 + 5], frac);
+        }
+    }
+  };
+  const RTable& rtable_;
 public:
   SKFilter (int over) :
-    over_ (over)
+    over_ (over),
+    rtable_ (RTable::the())
   {
     for (auto& channel : channels_)
       {
@@ -66,26 +144,7 @@ public:
       }
     else
       {
-        // two stages; use two filters with different resonance settings
-
-        // roots of 4th order butterworth in s, left semi-plane
-        double sq2inv = 1 / sqrt (2);
-        std::complex<double> r1 {-sq2inv,  sq2inv};
-        std::complex<double> r2 {-sq2inv, -sq2inv};
-
-        // R must be in interval [0:1]
-        std::complex<double> R = std::clamp (1 - res, 0.f, 1.f);
-        std::complex<double> a1 = R + std::sqrt (R * R - 1.0);
-
-        // roots with resonance
-        std::complex<double> r1res = r1 * std::sqrt (a1);
-        std::complex<double> r2res = r2 * std::sqrt (a1);
-
-        auto R1 = -r1res.real();
-        auto R2 = -r2res.real();
-
-        k_[0] = (1 - R1) * 2;
-        k_[1] = (1 - R2) * 2;
+        rtable_.lookup_resonance (res, mode2stages (mode_), &k_[0]);
       }
   }
   void
@@ -163,6 +222,9 @@ private:
                 case 5: return y2;
                 case 6: return y2hp;
                 case 7: return (y1hp - y2hp);
+                case 8: return y2;
+                case 9: return y2hp;
+                case 10: return (y1hp - y2hp);
                 default: return 0;
               }
           };
@@ -255,7 +317,7 @@ private:
   }
 
   using ProcessBlockFunc = decltype (&SKFilter::process_block_mode<0>);
-  static constexpr size_t LAST_MODE = 7;
+  static constexpr size_t LAST_MODE = 10;
 
   template<size_t... INDICES>
   static constexpr std::array<ProcessBlockFunc, LAST_MODE + 1>
