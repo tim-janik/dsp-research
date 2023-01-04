@@ -15,7 +15,7 @@ class SKFilter
   int over_ = 1;
   float freq_warp_factor_ = 0;
 
-  static constexpr int MAX_STAGES = 3;
+  static constexpr int MAX_STAGES = 4;
 
   struct Channel
   {
@@ -30,6 +30,8 @@ class SKFilter
   static constexpr int
   mode2stages (int mode)
   {
+    if (mode > 10)
+      return 4;
     if (mode > 7)
       return 3;
     else if (mode > 4)
@@ -43,10 +45,11 @@ class SKFilter
   class RTable {
     std::vector<float> res2_k;
     std::vector<float> res3_k;
+    std::vector<float> res4_k;
     static constexpr int TSIZE = 16;
     RTable()
     {
-      for (int order = 4; order <= 6; order += 2)
+      for (int order = 4; order <= 8; order += 2)
         {
           for (int t = 0; t <= TSIZE + 1; t++)
             {
@@ -79,6 +82,8 @@ class SKFilter
                     res2_k.push_back ((1 - xr) * 2);
                   if (order == 6)
                     res3_k.push_back ((1 - xr) * 2);
+                  if (order == 8)
+                    res4_k.push_back ((1 - xr) * 2);
                 }
             }
         }
@@ -91,7 +96,7 @@ class SKFilter
       return rtable;
     }
     void
-    lookup_resonance (float res, int stages, float *k) const
+    interpolate_resonance (float res, int stages, float *k, const std::vector<float>& res_k) const
     {
       auto lerp = [] (float a, float b, float frac) {
         return a + frac * (b - a);
@@ -101,17 +106,22 @@ class SKFilter
       int idx = fidx;
       float frac = fidx - idx;
 
+      for (int s = 0; s < stages; s++)
+        {
+          k[s] = lerp (res_k[idx * stages + s], res_k[idx * stages + stages + s], frac);
+        }
+    }
+    void
+    lookup_resonance (float res, int stages, float *k) const
+    {
       if (stages == 2)
-        {
-          k[0] = lerp (res2_k[idx * 2], res2_k[idx * 2 + 2], frac);
-          k[1] = lerp (res2_k[idx * 2 + 1], res2_k[idx * 2 + 3], frac);
-        }
-      else if (stages == 3)
-        {
-          k[0] = lerp (res3_k[idx * 3],     res3_k[idx * 3 + 3], frac);
-          k[1] = lerp (res3_k[idx * 3 + 1], res3_k[idx * 3 + 4], frac);
-          k[2] = lerp (res3_k[idx * 3 + 2], res3_k[idx * 3 + 5], frac);
-        }
+        interpolate_resonance (res, stages, k, res2_k);
+
+      if (stages == 3)
+        interpolate_resonance (res, stages, k, res3_k);
+
+      if (stages == 4)
+        interpolate_resonance (res, stages, k, res4_k);
     }
   };
   const RTable& rtable_;
@@ -225,6 +235,9 @@ private:
                 case 8: return y2;
                 case 9: return y2hp;
                 case 10: return (y1hp - y2hp);
+                case 11: return y2;
+                case 12: return y2hp;
+                case 13: return (y1hp - y2hp);
                 default: return 0;
               }
           };
@@ -317,7 +330,7 @@ private:
   }
 
   using ProcessBlockFunc = decltype (&SKFilter::process_block_mode<0>);
-  static constexpr size_t LAST_MODE = 10;
+  static constexpr size_t LAST_MODE = 13;
 
   template<size_t... INDICES>
   static constexpr std::array<ProcessBlockFunc, LAST_MODE + 1>
