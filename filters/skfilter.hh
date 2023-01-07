@@ -289,7 +289,7 @@ private:
   }
   template<int MODE>
   void
-  process_block_mode (uint n_samples, float *left, float *right, const float *freq_in)
+  process_block_mode (uint n_samples, float *left, float *right, const float *freq_in, const float *reso_in)
   {
     float over_samples_left[n_samples * over_];
     float over_samples_right[n_samples * over_];
@@ -303,6 +303,9 @@ private:
     uint j = 0;
     for (uint i = 0; i < n_samples * over_; i += over_)
       {
+        if (reso_in)
+          setup_k (reso_in[j]);
+
         /* we only support stereo (left != 0, right != 0) and mono (left != 0, right == 0) */
 
         if (left && right)
@@ -335,10 +338,10 @@ private:
   }
 public:
   void
-  process_block (uint n_samples, float *left, float *right, float *freq_in)
+  process_block (uint n_samples, float *left, float *right, const float *freq_in, const float *reso_in = nullptr)
   {
     static constexpr auto jump_table { make_jump_table (std::make_index_sequence<LAST_MODE + 1>()) };
 
-    (this->*jump_table[mode_]) (n_samples, left, right, freq_in);
+    (this->*jump_table[mode_]) (n_samples, left, right, freq_in, reso_in);
   }
 };

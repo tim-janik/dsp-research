@@ -91,19 +91,20 @@ main (int argc, char **argv)
       filter.set_params (atoi (argv[2]), 0.95);
 
       const int block_size = 512;
-      float left[block_size], right[block_size], freq[block_size];
+      float left[block_size], right[block_size], freq[block_size], reso[block_size];
 
       for (int i = 0; i < block_size; i++)
         {
           left[i] = right[i] = ((i % 100) - 50) / 50;
           freq[i] = 440 + i;
+          reso[i] = i / double (block_size);
         }
 
       double start_t = get_time();
 
       const int blocks = 10 * 1000;
       for (int b = 0; b < blocks; b++)
-        filter.process_block (block_size, left, right, freq);
+        filter.process_block (block_size, left, right, freq, reso);
 
       double end_t = get_time();
       double ns_per_sec = 1e9;
@@ -266,5 +267,45 @@ main (int argc, char **argv)
         {
           printf ("H%d_%zd(s)=1/(s*s+2*s*%.17g+1)\n", order, i, Rn[i]);
         }
+    }
+  if (argc == 3 && cmd == "rsweep") // <mode>
+    {
+      SKFilter filter (/* oversample */ 4);
+
+      const int block_size = 8192;
+      const int len = block_size * 30;
+      float left[len], right[len], freq[len];
+
+      for (int i = 0; i < len; i++)
+        {
+          const auto saw_len = 500;
+          const auto saw_len1 = 505;
+          const auto sl2 = saw_len * 0.5;
+          const auto sl21 = saw_len1 * 0.5;
+          left[i] = right[i] = ((i % saw_len) - sl2) / sl2 + ((i % saw_len1) - sl21) / sl21;
+          freq[i] = 1000;
+        }
+
+      double last_reso = 0;
+      filter.set_params (atoi (argv[2]), last_reso);
+
+      for (int b = 0; b + block_size <= len; b += block_size)
+        {
+          double reso = ((float)rand() / RAND_MAX);
+          reso = 1 - reso * reso;
+          filter.set_scale (0.05, 1);
+
+          float reso_in[block_size];
+          for (int i = 0; i < block_size; i++)
+            reso_in[i] = last_reso + (reso - last_reso) * i / double (block_size);
+
+          last_reso = reso;
+          filter.process_block (block_size, left + b, right + b, freq + b, reso_in);
+        }
+      float mx = 0;
+      for (int i = 0; i < len; i++)
+        mx = std::max (std::abs (left[i]), mx);
+      for (int i = 0; i < len; i++)
+        printf ("%f %f\n", left[i] / mx, right[i] / mx);
     }
 }
