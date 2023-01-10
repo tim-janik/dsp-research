@@ -15,6 +15,7 @@ class SKFilter
   float freq_warp_factor_ = 0;
 
   static constexpr int MAX_STAGES = 4;
+  static constexpr uint MAX_BLOCK_SIZE = 1024;
 
   struct Channel
   {
@@ -342,6 +343,22 @@ public:
   {
     static constexpr auto jump_table { make_jump_table (std::make_index_sequence<LAST_MODE + 1>()) };
 
-    (this->*jump_table[mode_]) (n_samples, left, right, freq_in, reso_in);
+    while (n_samples)
+      {
+        const uint todo = std::min (n_samples, MAX_BLOCK_SIZE);
+
+        (this->*jump_table[mode_]) (todo, left, right, freq_in, reso_in);
+
+        if (left)
+          left += todo;
+        if (right)
+          right += todo;
+        if (freq_in)
+          freq_in += todo;
+        if (reso_in)
+          reso_in += todo;
+
+        n_samples -= todo;
+      }
   }
 };

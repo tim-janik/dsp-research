@@ -8,6 +8,7 @@
   void tick (float *l, float *r, float freq, float reso, float drive, float mix);
   void process_block (float *l, float *r, uint n_values);
 
+- laddervcf may need stack limit (like SKFilter)
 - resonance normalization?
 - freq/reso normalization?
 - multiple modes
