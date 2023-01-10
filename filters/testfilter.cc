@@ -113,7 +113,7 @@ main (int argc, char **argv)
       printf ("# ns/sample %f\n",  ns_per_sample);
       printf ("# bogopolyphony = %f\n", 1e9 / (ns_per_sample * 48000));
     }
-  if (argc == 6 && cmd == "sweep")
+  if (argc == 6 && cmd == "sweep") // <freq> <over> <mode> <res>
     {
       vector<float> left;
       vector<float> right;
@@ -307,5 +307,43 @@ main (int argc, char **argv)
         mx = std::max (std::abs (left[i]), mx);
       for (int i = 0; i < len; i++)
         printf ("%f %f\n", left[i] / mx, right[i] / mx);
+    }
+  if (argc == 3 && cmd == "lmax") // <res>
+    {
+      /* numerically find maximum of HLP (freq, res)
+       * there is probably a direct solution to this problem as well
+       */
+      auto HLP = [] (double freq, double res) {
+        auto s = std::complex (0.0, freq);
+
+        return std::abs (1.0/(s*s + 2*(1-res)*s + 1.0));
+      };
+      double res = atof (argv[2]);
+      double x = 0.1, dx = 0.1;
+      double best = -1;
+      while (dx > 1e-14)
+        {
+          double v;
+          v = HLP (x + dx, res);
+          if (v > best)
+            {
+              x += dx;
+              best = v;
+            }
+          else
+            {
+              v = HLP (x - dx, res);
+              if (v > best)
+                {
+                  x -= dx;
+                  best = v;
+                }
+              else
+                {
+                  dx *= 0.5;
+                }
+            }
+        }
+      printf ("%f\n", best);
     }
 }
