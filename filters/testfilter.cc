@@ -3,6 +3,7 @@
 #include "skfilter.hh"
 #include "laddervcf.hh"
 
+#include <fftw3.h>
 #include <sys/time.h>
 #include <string>
 #include <complex>
@@ -25,6 +26,35 @@ db_from_complex (float re, float im, float min_dB)
     }
   else
     return min_dB;
+}
+
+inline double
+window_blackman_harris_92 (double x)
+{
+  if (fabs (x) > 1)
+    return 0;
+
+  const double a0 = 0.35875, a1 = 0.48829, a2 = 0.14128, a3 = 0.01168;
+
+  return a0 + a1 * cos (M_PI * x) + a2 * cos (2.0 * M_PI * x) + a3 * cos (3.0 * M_PI * x);
+}
+
+void
+fft (const uint n_values, float *r_values_in, float *ri_values_out)
+{
+  auto plan_fft = fftwf_plan_dft_r2c_1d (n_values, r_values_in, (fftwf_complex *) ri_values_out, FFTW_ESTIMATE | FFTW_PRESERVE_INPUT);
+
+  fftwf_execute_dft_r2c (plan_fft, r_values_in, (fftwf_complex *) ri_values_out);
+
+  // usually we should keep the plan, but for this simple test program, the fft
+  // is only computed once, so we can destroy the plan here
+  fftwf_destroy_plan (plan_fft);
+}
+
+double
+db (double x)
+{
+  return 20 * log10 (std::max (x, 0.00000001));
 }
 
 inline double
@@ -345,5 +375,60 @@ main (int argc, char **argv)
             }
         }
       printf ("%f\n", best);
+    }
+  if (argc == 5 && cmd == "nfilt") // <mode> <res> <vol>
+    {
+      SKFilter filter (/* oversample */ 4);
+
+      const int blocks = 2;
+      const int block_size = 8192;
+      const int len = block_size * blocks;
+      vector<float> in (len), freq (len);
+
+      for (int i = 0; i < len; i++)
+        {
+          in[i] = ((i % 240) - 120) / 120.0; // 200 Hz Saw
+          freq[i] = 5000;
+        }
+
+      auto resonance = atof (argv[3]);
+      resonance += log2 (atof (argv[4])) * 0.1;
+      float vol = pow(10,((resonance*-18)/20)) * atof (argv[4]);
+      //auto rtrans = 1- (1-resonance)*(1-resonance)*(1-M_SQRT2/4);
+      auto rtrans = resonance<0.9?1- (1-resonance)*(1-resonance)*(1-sqrt(2)/4):1-pow(1-0.9,2)*(1-sqrt(2)/4)+(resonance-0.9)*0.1;
+      filter.set_params (atoi (argv[2]), rtrans);
+      filter.set_scale (vol, std::max (1 / vol, 1.0f));
+      filter.process_block (len, in.data(), nullptr, freq.data());
+
+      static constexpr int ZERO_PAD = 8;
+      vector<float> fft_in (block_size * ZERO_PAD), fft_out (block_size * ZERO_PAD);
+      vector<float> fft_out_sum (block_size * ZERO_PAD / 2);
+
+      double window_weight = 0;
+      for (int i = 0; i < block_size; i++)
+        {
+          const double wsize_2 = block_size / 2;
+          const double w = window_blackman_harris_92 ((i - wsize_2) / wsize_2);
+          window_weight += w;
+          fft_in[i] = in[block_size + i] * w;
+        }
+      for (auto& x : fft_in)
+        x *= 2 / window_weight;
+      fft (block_size * ZERO_PAD, fft_in.data(), fft_out.data());
+      for (size_t i = 0; i < block_size * ZERO_PAD; i += 2)
+        fft_out_sum[i / 2] = std::abs (std::complex (fft_out[i], fft_out[i + 1]));
+
+      for (size_t i = 1; i < fft_out_sum.size() - 1; i++)
+        {
+          if ((fft_out_sum[i] > fft_out_sum[i - 1]) && (fft_out_sum[i] > fft_out_sum[i + 1]))
+            {
+              auto norm_freq = 48000 / 2.0 * i / fft_out_sum.size();
+              auto norm_height = fft_out_sum[i];
+              auto fdiff = norm_freq - (int ((norm_freq + 100) / 200)) * 200;
+
+              if (abs (fdiff) < 10)
+                printf ("%f %f\n", norm_freq, db (norm_height));
+            }
+        }
     }
 }
