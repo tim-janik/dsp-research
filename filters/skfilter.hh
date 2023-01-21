@@ -11,6 +11,8 @@ class SKFilter
   float pre_scale_ = 1;
   float post_scale_ = 1;
   int mode_ = 0;
+  float reso_ = 0;
+  float drive_ = 0;
   int over_ = 1;
   float freq_warp_factor_ = 0;
 
@@ -139,6 +141,16 @@ public:
     post_scale_ = post;
   }
   void
+  apply_reso_drive (float reso, float drive)
+  {
+    reso += drive * 0.015;
+    float vol = pow (10, (drive + -18 * reso) / 20);
+    reso = reso<0.9?1- (1-reso)*(1-reso)*(1-sqrt(2)/4):1-pow(1-0.9,2)*(1-sqrt(2)/4)+(reso-0.9)*0.1;
+
+    set_scale (vol, std::max (1 / vol, 1.0f));
+    setup_k (reso);
+  }
+  void
   setup_k (float res)
   {
     if (mode2stages (mode_) == 1)
@@ -156,6 +168,21 @@ public:
   {
     mode_ = i;
     setup_k (res);
+  }
+  void
+  set_mode (int m)
+  {
+    mode_ = m;
+  }
+  void
+  set_reso (float reso)
+  {
+    reso_ = reso;
+  }
+  void
+  set_drive (float drive)
+  {
+    drive_ = drive;
   }
   void
   reset ()
@@ -290,7 +317,7 @@ private:
   }
   template<int MODE>
   void
-  process_block_mode (uint n_samples, float *left, float *right, const float *freq_in, const float *reso_in)
+  process_block_mode (uint n_samples, float *left, float *right, const float *freq_in, const float *reso_in, const float *drive_in)
   {
     float over_samples_left[n_samples * over_];
     float over_samples_right[n_samples * over_];
@@ -304,8 +331,7 @@ private:
     uint j = 0;
     for (uint i = 0; i < n_samples * over_; i += over_)
       {
-        if (reso_in)
-          setup_k (reso_in[j]);
+        apply_reso_drive (reso_in ? reso_in[j] : reso_, drive_in ? drive_in[j] : drive_);
 
         /* we only support stereo (left != 0, right != 0) and mono (left != 0, right == 0) */
 
@@ -339,7 +365,7 @@ private:
   }
 public:
   void
-  process_block (uint n_samples, float *left, float *right, const float *freq_in, const float *reso_in = nullptr)
+  process_block (uint n_samples, float *left, float *right, const float *freq_in, const float *reso_in = nullptr, const float *drive_in = nullptr)
   {
     static constexpr auto jump_table { make_jump_table (std::make_index_sequence<LAST_MODE + 1>()) };
 
@@ -347,7 +373,7 @@ public:
       {
         const uint todo = std::min (n_samples, MAX_BLOCK_SIZE);
 
-        (this->*jump_table[mode_]) (todo, left, right, freq_in, reso_in);
+        (this->*jump_table[mode_]) (todo, left, right, freq_in, reso_in, drive_in);
 
         if (left)
           left += todo;

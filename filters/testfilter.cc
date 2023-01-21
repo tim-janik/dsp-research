@@ -391,13 +391,9 @@ main (int argc, char **argv)
           freq[i] = 5000;
         }
 
-      auto resonance = atof (argv[3]);
-      resonance += log2 (atof (argv[4])) * 0.1;
-      float vol = pow(10,((resonance*-18)/20)) * atof (argv[4]);
-      //auto rtrans = 1- (1-resonance)*(1-resonance)*(1-M_SQRT2/4);
-      auto rtrans = resonance<0.9?1- (1-resonance)*(1-resonance)*(1-sqrt(2)/4):1-pow(1-0.9,2)*(1-sqrt(2)/4)+(resonance-0.9)*0.1;
-      filter.set_params (atoi (argv[2]), rtrans);
-      filter.set_scale (vol, std::max (1 / vol, 1.0f));
+      filter.set_mode (atoi (argv[2]));
+      filter.set_reso (atof (argv[3]));
+      filter.set_drive (atof (argv[4]));
       filter.process_block (len, in.data(), nullptr, freq.data());
 
       static constexpr int ZERO_PAD = 8;
