@@ -143,9 +143,23 @@ public:
   void
   apply_reso_drive (float reso, float drive)
   {
-    reso += drive * 0.015;
-    float vol = pow (10, (drive + -18 * reso) / 20);
-    reso = reso<0.9?1- (1-reso)*(1-reso)*(1-sqrt(2)/4):1-pow(1-0.9,2)*(1-sqrt(2)/4)+(reso-0.9)*0.1;
+    const float db_x2_factor = 0.166096404744368; // 1/(20*log(2)/log(10))
+    const float sqrt2 = M_SQRT2;
+
+    // drive resonance boost
+    if (drive > 0)
+      reso += drive * 0.015f;
+
+    float vol = exp2f ((drive + -18 * reso) * db_x2_factor);
+
+    if (reso < 0.9)
+      {
+        reso = 1 - (1-reso)*(1-reso)*(1-sqrt2/4);
+      }
+    else
+      {
+        reso = 1 - (1-0.9f)*(1-0.9f)*(1-sqrt2/4) + (reso-0.9f)*0.1f;
+      }
 
     set_scale (vol, std::max (1 / vol, 1.0f));
     setup_k (reso);
