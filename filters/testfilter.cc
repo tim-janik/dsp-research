@@ -104,6 +104,60 @@ test (const vector<float>& samples)
     }
 }
 
+vector<float>
+filter_partials_test (SKFilter& filter)
+{
+  const int blocks = 2;
+  const int block_size = 8192;
+  const int len = block_size * blocks;
+  vector<float> in (len), freq (len);
+
+  for (int i = 0; i < len; i++)
+    {
+      in[i] = ((i % 240) - 120) / 120.0; // 200 Hz Saw
+      freq[i] = 5000;
+    }
+  filter.process_block (len, in.data(), nullptr, freq.data());
+
+  static constexpr int ZERO_PAD = 8;
+  vector<float> fft_in (block_size * ZERO_PAD), fft_out (block_size * ZERO_PAD);
+  vector<float> fft_out_sum (block_size * ZERO_PAD / 2);
+
+  double window_weight = 0;
+  for (int i = 0; i < block_size; i++)
+    {
+      const double wsize_2 = block_size / 2;
+      const double w = window_blackman_harris_92 ((i - wsize_2) / wsize_2);
+      window_weight += w;
+      fft_in[i] = in[block_size + i] * w;
+    }
+  for (auto& x : fft_in)
+    x *= 2 / window_weight;
+  fft (block_size * ZERO_PAD, fft_in.data(), fft_out.data());
+  for (size_t i = 0; i < block_size * ZERO_PAD; i += 2)
+    fft_out_sum[i / 2] = std::abs (std::complex (fft_out[i], fft_out[i + 1]));
+
+  vector<float> partials;
+
+  for (size_t i = 1; i < fft_out_sum.size() - 1; i++)
+    {
+      if ((fft_out_sum[i] > fft_out_sum[i - 1]) && (fft_out_sum[i] > fft_out_sum[i + 1]))
+        {
+          auto norm_freq = 48000 / 2.0 * i / fft_out_sum.size();
+          auto norm_height = fft_out_sum[i];
+          int partial = (norm_freq + 100) / 200;
+          auto fdiff = norm_freq - partial * 200;
+
+          if (abs (fdiff) < 10)
+            {
+              partials.resize (partial + 1);
+              partials[partial] = norm_height;
+            }
+        }
+    }
+  return partials;
+}
+
 int
 main (int argc, char **argv)
 {
@@ -380,51 +434,29 @@ main (int argc, char **argv)
     {
       SKFilter filter (/* oversample */ 4);
 
-      const int blocks = 2;
-      const int block_size = 8192;
-      const int len = block_size * blocks;
-      vector<float> in (len), freq (len);
-
-      for (int i = 0; i < len; i++)
-        {
-          in[i] = ((i % 240) - 120) / 120.0; // 200 Hz Saw
-          freq[i] = 5000;
-        }
-
       filter.set_mode (atoi (argv[2]));
       filter.set_reso (atof (argv[3]));
       filter.set_drive (atof (argv[4]));
-      filter.process_block (len, in.data(), nullptr, freq.data());
 
-      static constexpr int ZERO_PAD = 8;
-      vector<float> fft_in (block_size * ZERO_PAD), fft_out (block_size * ZERO_PAD);
-      vector<float> fft_out_sum (block_size * ZERO_PAD / 2);
-
-      double window_weight = 0;
-      for (int i = 0; i < block_size; i++)
+      auto partials = filter_partials_test (filter);
+      for (size_t p = 0; p < partials.size(); p++)
         {
-          const double wsize_2 = block_size / 2;
-          const double w = window_blackman_harris_92 ((i - wsize_2) / wsize_2);
-          window_weight += w;
-          fft_in[i] = in[block_size + i] * w;
+          if (partials[p])
+            printf ("%zd %f\n", p * 200, db (partials[p]));
         }
-      for (auto& x : fft_in)
-        x *= 2 / window_weight;
-      fft (block_size * ZERO_PAD, fft_in.data(), fft_out.data());
-      for (size_t i = 0; i < block_size * ZERO_PAD; i += 2)
-        fft_out_sum[i / 2] = std::abs (std::complex (fft_out[i], fft_out[i + 1]));
-
-      for (size_t i = 1; i < fft_out_sum.size() - 1; i++)
+    }
+  if (argc == 4 && cmd == "nfscan") // <mode> <drive>
+    {
+      for (int reso = 0; reso < 125; reso++)
         {
-          if ((fft_out_sum[i] > fft_out_sum[i - 1]) && (fft_out_sum[i] > fft_out_sum[i + 1]))
-            {
-              auto norm_freq = 48000 / 2.0 * i / fft_out_sum.size();
-              auto norm_height = fft_out_sum[i];
-              auto fdiff = norm_freq - (int ((norm_freq + 100) / 200)) * 200;
+          SKFilter filter (/* oversample */ 4);
 
-              if (abs (fdiff) < 10)
-                printf ("%f %f\n", norm_freq, db (norm_height));
-            }
+          filter.set_mode (atoi (argv[2]));
+          filter.set_drive (atof (argv[3]));
+          filter.set_reso (reso * 0.01);
+
+          auto partials = filter_partials_test (filter);
+          printf ("%d %f\n", reso, db (partials[5000 / 200]));
         }
     }
 }
