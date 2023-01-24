@@ -172,7 +172,8 @@ main (int argc, char **argv)
   if (argc == 3 && cmd == "perf")
     {
       SKFilter filter (/* oversample */ 4);
-      filter.set_params (atoi (argv[2]), 0.95);
+      filter.set_mode (atoi (argv[2]));
+      filter.set_reso (0.95);
 
       const int block_size = 512;
       float left[block_size], right[block_size], freq[block_size], reso[block_size];
@@ -218,7 +219,8 @@ main (int argc, char **argv)
       float pre_scale = 0.001;
       filter.set_scale (pre_scale, 1 / pre_scale);
 
-      filter.set_params (atoi (argv[4]), atof (argv[5]));
+      filter.set_mode (atoi (argv[4]));
+      filter.set_reso (atof (argv[5]));
       filter.process_block (left.size(), left.data(), right.data(), freq.data());
 
       vector<float> out;
@@ -271,8 +273,10 @@ main (int argc, char **argv)
       filter.set_scale (pre_scale, 1 / pre_scale);
       filter2.set_scale (pre_scale, 1 / pre_scale);
 
-      filter.set_params (atoi (argv[4]), 1 - R1);
-      filter2.set_params (atoi (argv[4]), 1 - R2);
+      filter.set_mode (atoi (argv[4]));
+      filter.set_reso (1 - R1);
+      filter2.set_mode (atoi (argv[4]));
+      filter2.set_reso (1 - R2);
       filter.process_block (left.size(), left.data(), right.data(), freq.data());
       filter2.process_block (left.size(), left.data(), right.data(), freq.data());
 
@@ -371,7 +375,8 @@ main (int argc, char **argv)
         }
 
       double last_reso = 0;
-      filter.set_params (atoi (argv[2]), last_reso);
+      filter.set_mode (atoi (argv[2]));
+      filter.set_reso (last_reso);
 
       for (int b = 0; b + block_size <= len; b += block_size)
         {

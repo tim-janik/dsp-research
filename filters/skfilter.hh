@@ -178,12 +178,6 @@ public:
       }
   }
   void
-  set_params (int i, float res)
-  {
-    mode_ = i;
-    setup_k (res);
-  }
-  void
   set_mode (int m)
   {
     mode_ = m;
