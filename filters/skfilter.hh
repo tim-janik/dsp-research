@@ -11,6 +11,7 @@ class SKFilter
   float pre_scale_ = 1;
   float post_scale_ = 1;
   int mode_ = 0;
+  float freq_ = 440;
   float reso_ = 0;
   float drive_ = 0;
   bool test_linear_ = false;
@@ -190,6 +191,11 @@ public:
     mode_ = m;
   }
   void
+  set_freq (float freq)
+  {
+    freq_ = freq;
+  }
+  void
   set_reso (float reso)
   {
     reso_ = reso;
@@ -237,7 +243,7 @@ private:
   }
   template<int MODE, bool STEREO>
   void
-  process (float *left, float *right, float freq)
+  process (float *left, float *right, float freq, uint n_samples)
   {
     float g = cutoff_warp (freq); // FIXME: clamp freq
     float G = g / (1 + g);
@@ -302,7 +308,7 @@ private:
             s2r = channels_[1].s2[stage];
           }
 
-        for (int i = 0; i < over_; i++)
+        for (uint i = 0; i < n_samples; i++)
           {
             /*
              * interleaving processing of both channels performs better than
@@ -342,33 +348,65 @@ private:
     float over_samples_left[n_samples * over_];
     float over_samples_right[n_samples * over_];
 
-    if (left)
-      channels_[0].res_up->process_block (left, n_samples, over_samples_left);
+    /* we only support stereo (left != 0, right != 0) and mono (left != 0, right == 0) */
+    bool stereo = left && right;
 
-    if (right)
+    channels_[0].res_up->process_block (left, n_samples, over_samples_left);
+    if (stereo)
       channels_[1].res_up->process_block (right, n_samples, over_samples_right);
 
-    uint j = 0;
-    for (uint i = 0; i < n_samples * over_; i += over_)
+    if (reso_in || drive_in)
       {
-        apply_reso_drive (reso_in ? reso_in[j] : reso_, drive_in ? drive_in[j] : drive_);
-
-        /* we only support stereo (left != 0, right != 0) and mono (left != 0, right == 0) */
-
-        if (left && right)
+        uint j = 0;
+        for (uint i = 0; i < n_samples * over_; i += over_)
           {
-            process<MODE, true>  (over_samples_left + i, over_samples_right + i, freq_in[j++]);
+            apply_reso_drive (reso_in ? reso_in[j] : reso_, drive_in ? drive_in[j] : drive_);
+
+            float freq = freq_in ? freq_in[j++] : freq_;
+
+            if (stereo)
+              {
+                process<MODE, true>  (over_samples_left + i, over_samples_right + i, freq, over_);
+              }
+            else
+              {
+                process<MODE, false> (over_samples_left + i, nullptr, freq, over_);
+              }
+          }
+      }
+    else if (freq_in)
+      {
+        apply_reso_drive (reso_, drive_);
+
+        uint j = 0;
+        for (uint i = 0; i < n_samples * over_; i += over_)
+          {
+            if (stereo)
+              {
+                process<MODE, true>  (over_samples_left + i, over_samples_right + i, freq_in[j++], over_);
+              }
+            else
+              {
+                process<MODE, false> (over_samples_left + i, nullptr, freq_in[j++], over_);
+              }
+          }
+      }
+    else
+      {
+        apply_reso_drive (reso_, drive_);
+
+        if (stereo)
+          {
+            process<MODE, true>  (over_samples_left, over_samples_right, freq_, n_samples * over_);
           }
         else
           {
-            process<MODE, false> (over_samples_left + i, nullptr, freq_in[j++]);
+            process<MODE, false> (over_samples_left, nullptr, freq_, n_samples * over_);
           }
       }
 
-    if (left)
-      channels_[0].res_down->process_block (over_samples_left, n_samples * over_, left);
-
-    if (right)
+    channels_[0].res_down->process_block (over_samples_left, n_samples * over_, left);
+    if (stereo)
       channels_[1].res_down->process_block (over_samples_right, n_samples * over_, right);
   }
 

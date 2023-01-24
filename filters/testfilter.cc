@@ -171,32 +171,43 @@ main (int argc, char **argv)
 
   if (argc == 3 && cmd == "perf")
     {
-      SKFilter filter (/* oversample */ 4);
-      filter.set_mode (atoi (argv[2]));
-      filter.set_reso (0.95);
-
-      const int block_size = 512;
-      float left[block_size], right[block_size], freq[block_size], reso[block_size];
-
-      for (int i = 0; i < block_size; i++)
+      for (int test = 0; test < 3; test++)
         {
-          left[i] = right[i] = ((i % 100) - 50) / 50;
-          freq[i] = 440 + i;
-          reso[i] = i / double (block_size);
+          int r, f;
+          switch (test)
+            {
+              case 0: r = 0; f = 0; break;
+              case 1: r = 0; f = 1; break;
+              case 2: r = 1; f = 1; break;
+            }
+
+          SKFilter filter (/* oversample */ 4);
+          filter.set_mode (atoi (argv[2]));
+          filter.set_reso (0.95);
+
+          const int block_size = 512;
+          float left[block_size], right[block_size], freq[block_size], reso[block_size];
+
+          for (int i = 0; i < block_size; i++)
+            {
+              left[i] = right[i] = ((i % 100) - 50) / 50;
+              freq[i] = 440 + i;
+              reso[i] = i / double (block_size);
+            }
+
+          double start_t = get_time();
+
+          const int blocks = 10 * 1000;
+          for (int b = 0; b < blocks; b++)
+            filter.process_block (block_size, left, right, f ? freq : nullptr, r ? reso : nullptr);
+
+          double end_t = get_time();
+          double ns_per_sec = 1e9;
+          double ns_per_sample = ns_per_sec * (end_t - start_t) / (blocks * block_size);
+
+          printf ("with freq=%d reso=%d: ns/sample %f\n", f, r, ns_per_sample);
+          printf ("                   bogopolyphony = %f\n\n", 1e9 / (ns_per_sample * 48000));
         }
-
-      double start_t = get_time();
-
-      const int blocks = 10 * 1000;
-      for (int b = 0; b < blocks; b++)
-        filter.process_block (block_size, left, right, freq, reso);
-
-      double end_t = get_time();
-      double ns_per_sec = 1e9;
-      double ns_per_sample = ns_per_sec * (end_t - start_t) / (blocks * block_size);
-
-      printf ("# ns/sample %f\n",  ns_per_sample);
-      printf ("# bogopolyphony = %f\n", 1e9 / (ns_per_sample * 48000));
     }
   if (argc == 6 && cmd == "sweep") // <freq> <over> <mode> <res>
     {
