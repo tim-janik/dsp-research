@@ -8,8 +8,6 @@ using PandaResampler::Resampler2;
 
 class SKFilter
 {
-  float pre_scale_ = 1;
-  float post_scale_ = 1;
   int mode_ = 0;
   float freq_ = 440;
   float reso_ = 0;
@@ -29,8 +27,12 @@ class SKFilter
     std::array<float, MAX_STAGES> s1;
     std::array<float, MAX_STAGES> s2;
   };
-  std::array<float, MAX_STAGES> k_;
-
+  struct FParams
+  {
+    std::array<float, MAX_STAGES> k;
+    float pre_scale = 1;
+    float post_scale = 1;
+  };
   static constexpr int
   mode2stages (int mode)
   {
@@ -137,17 +139,18 @@ public:
     reset();
   }
 private:
-  void
+  FParams
   apply_reso_drive (float reso, float drive)
   {
+    FParams fparams;
     if (test_linear_) // test filter as linear filter; don't do any resonance correction
       {
         const float scale = 1e-5;
-        pre_scale_ = scale;
-        post_scale_ = 1 / scale;
-        setup_k (reso);
+        fparams.pre_scale = scale;
+        fparams.post_scale = 1 / scale;
+        setup_k (fparams, reso);
 
-        return;
+        return fparams;
       }
     const float db_x2_factor = 0.166096404744368; // 1/(20*log(2)/log(10))
     const float sqrt2 = M_SQRT2;
@@ -167,21 +170,23 @@ private:
         reso = 1 - (1-0.9f)*(1-0.9f)*(1-sqrt2/4) + (reso-0.9f)*0.1f;
       }
 
-    pre_scale_ = vol;
-    post_scale_ = std::max (1 / vol, 1.0f);
-    setup_k (reso);
+    fparams.pre_scale = vol;
+    fparams.post_scale = std::max (1 / vol, 1.0f);
+    setup_k (fparams, reso);
+
+    return fparams;
   }
   void
-  setup_k (float res)
+  setup_k (FParams& fparams, float res)
   {
     if (mode2stages (mode_) == 1)
       {
         // just one stage
-        k_[0] = res * 2;
+        fparams.k[0] = res * 2;
       }
     else
       {
-        rtable_.lookup_resonance (res, mode2stages (mode_), &k_[0]);
+        rtable_.lookup_resonance (res, mode2stages (mode_), fparams.k.data());
       }
   }
 public:
@@ -243,14 +248,14 @@ private:
   }
   template<int MODE, bool STEREO>
   void
-  process (float *left, float *right, float freq, uint n_samples)
+  process (float *left, float *right, float freq, const FParams& fparams, uint n_samples)
   {
     float g = cutoff_warp (freq); // FIXME: clamp freq
     float G = g / (1 + g);
 
     for (int stage = 0; stage < mode2stages (MODE); stage++)
       {
-        const float k = k_[stage];
+        const float k = fparams.k[stage];
 
         float xnorm = 1.f / (1 - k * G + k * G * G);
         float s1feedback = -xnorm * k * (G - 1) / (1 + g);
@@ -315,8 +320,8 @@ private:
              * processing left and right channel seperately (measured on Ryzen7)
              */
 
-                        { xl = left[i]  * pre_scale_; }
-            if (STEREO) { xr = right[i] * pre_scale_; }
+                        { xl = left[i]  * fparams.pre_scale; }
+            if (STEREO) { xr = right[i] * fparams.pre_scale; }
 
                         { y0l = distort (xl * xnorm + s1l * s1feedback + s2l * s2feedback); }
             if (STEREO) { y0r = distort (xr * xnorm + s1r * s1feedback + s2r * s2feedback); }
@@ -327,8 +332,8 @@ private:
                         { y2l = lowpass (y1l, s2l); }
             if (STEREO) { y2r = lowpass (y1r, s2r); }
 
-                        { left[i]  = mode_out (y0l, y1l, y2l) * post_scale_; }
-            if (STEREO) { right[i] = mode_out (y0r, y1r, y2r) * post_scale_; }
+                        { left[i]  = mode_out (y0l, y1l, y2l) * fparams.post_scale; }
+            if (STEREO) { right[i] = mode_out (y0r, y1r, y2r) * fparams.post_scale; }
           }
 
         channels_[0].s1[stage] = s1l;
@@ -357,51 +362,90 @@ private:
 
     if (reso_in || drive_in)
       {
-        uint j = 0;
-        for (uint i = 0; i < n_samples * over_; i += over_)
+        /* for reso or drive modulation, we split the input it into small blocks
+         * and interpolate the pre_scale / post_scale / k parameters
+         */
+        float *left_blk = over_samples_left;
+        float *right_blk = over_samples_right;
+
+        uint n_remaining_samples = n_samples;
+        while (n_remaining_samples)
           {
-            apply_reso_drive (reso_in ? reso_in[j] : reso_, drive_in ? drive_in[j] : drive_);
+            const uint todo = std::min<uint> (n_remaining_samples, 64);
 
-            float freq = freq_in ? freq_in[j++] : freq_;
+            FParams fparams = apply_reso_drive (reso_in ? reso_in[0] : reso_, drive_in ? drive_in[0] : drive_);
+            FParams fparams_end = apply_reso_drive (reso_in ? reso_in[todo - 1] : reso_, drive_in ? drive_in[todo - 1] : drive_);
 
-            if (stereo)
+            constexpr static int STAGES = mode2stages (MODE);
+            float delta_pre_scale = (fparams_end.pre_scale - fparams.pre_scale) / n_samples;
+            float delta_post_scale = (fparams_end.post_scale - fparams.post_scale) / n_samples;
+            float delta_k[STAGES];
+            for (int stage = 0; stage < STAGES; stage++)
+              delta_k[stage] = (fparams_end.k[stage] - fparams.k[stage]) / n_samples;
+
+            uint j = 0;
+            for (uint i = 0; i < todo * over_; i += over_)
               {
-                process<MODE, true>  (over_samples_left + i, over_samples_right + i, freq, over_);
+                float freq = freq_in ? freq_in[j++] : freq_;
+
+                if (stereo)
+                  {
+                    process<MODE, true>  (left_blk + i, right_blk + i, freq, fparams, over_);
+                  }
+                else
+                  {
+                    process<MODE, false> (left_blk + i, nullptr, freq, fparams, over_);
+                  }
+
+                fparams.pre_scale += delta_pre_scale;
+                fparams.post_scale += delta_post_scale;
+
+                for (int stage = 0; stage < STAGES; stage++)
+                  fparams.k[stage] += delta_k[stage];
               }
-            else
-              {
-                process<MODE, false> (over_samples_left + i, nullptr, freq, over_);
-              }
+
+            n_remaining_samples -= todo;
+            left_blk += todo * over_;
+            right_blk += todo * over_;
+
+            if (freq_in)
+              freq_in += todo;
+            if (reso_in)
+              reso_in += todo;
+            if (drive_in)
+              drive_in += todo;
           }
       }
     else if (freq_in)
       {
-        apply_reso_drive (reso_, drive_);
+        FParams fparams = apply_reso_drive (reso_, drive_);
 
         uint j = 0;
         for (uint i = 0; i < n_samples * over_; i += over_)
           {
+            float freq = freq_in[j++];
+
             if (stereo)
               {
-                process<MODE, true>  (over_samples_left + i, over_samples_right + i, freq_in[j++], over_);
+                process<MODE, true>  (over_samples_left + i, over_samples_right + i, freq, fparams, over_);
               }
             else
               {
-                process<MODE, false> (over_samples_left + i, nullptr, freq_in[j++], over_);
+                process<MODE, false> (over_samples_left + i, nullptr, freq, fparams, over_);
               }
           }
       }
     else
       {
-        apply_reso_drive (reso_, drive_);
+        FParams fparams = apply_reso_drive (reso_, drive_);
 
         if (stereo)
           {
-            process<MODE, true>  (over_samples_left, over_samples_right, freq_, n_samples * over_);
+            process<MODE, true>  (over_samples_left, over_samples_right, freq_, fparams, n_samples * over_);
           }
         else
           {
-            process<MODE, false> (over_samples_left, nullptr, freq_, n_samples * over_);
+            process<MODE, false> (over_samples_left, nullptr, freq_, fparams, n_samples * over_);
           }
       }
 
@@ -441,6 +485,8 @@ public:
           freq_in += todo;
         if (reso_in)
           reso_in += todo;
+        if (drive_in)
+          drive_in += todo;
 
         n_samples -= todo;
       }
