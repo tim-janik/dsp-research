@@ -215,10 +215,7 @@ main (int argc, char **argv)
 
       SKFilter filter (atoi (argv[3]));
 
-      /* test how the filter behaves as a linear filter (without distortion) */
-      float pre_scale = 0.001;
-      filter.set_scale (pre_scale, 1 / pre_scale);
-
+      filter.set_test_linear (true);
       filter.set_mode (atoi (argv[4]));
       filter.set_reso (atof (argv[5]));
       filter.process_block (left.size(), left.data(), right.data(), freq.data());
@@ -268,15 +265,14 @@ main (int argc, char **argv)
       SKFilter filter (atoi (argv[3]));
       SKFilter filter2 (atoi (argv[3]));
 
-      /* test how the filter behaves as a linear filter (without distortion) */
-      float pre_scale = 0.001;
-      filter.set_scale (pre_scale, 1 / pre_scale);
-      filter2.set_scale (pre_scale, 1 / pre_scale);
-
+      filter.set_test_linear (true);
       filter.set_mode (atoi (argv[4]));
       filter.set_reso (1 - R1);
+
+      filter2.set_test_linear (true);
       filter2.set_mode (atoi (argv[4]));
       filter2.set_reso (1 - R2);
+
       filter.process_block (left.size(), left.data(), right.data(), freq.data());
       filter2.process_block (left.size(), left.data(), right.data(), freq.data());
 
@@ -382,7 +378,6 @@ main (int argc, char **argv)
         {
           double reso = ((float)rand() / RAND_MAX);
           reso = 1 - reso * reso;
-          filter.set_scale (0.05, 1);
 
           float reso_in[block_size];
           for (int i = 0; i < block_size; i++)

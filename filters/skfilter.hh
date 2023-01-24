@@ -13,6 +13,7 @@ class SKFilter
   int mode_ = 0;
   float reso_ = 0;
   float drive_ = 0;
+  bool test_linear_ = false;
   int over_ = 1;
   float freq_warp_factor_ = 0;
 
@@ -134,15 +135,19 @@ public:
     set_rate (48000);
     reset();
   }
-  void
-  set_scale (float pre, float post)
-  {
-    pre_scale_ = pre;
-    post_scale_ = post;
-  }
+private:
   void
   apply_reso_drive (float reso, float drive)
   {
+    if (test_linear_) // test filter as linear filter; don't do any resonance correction
+      {
+        const float scale = 1e-5;
+        pre_scale_ = scale;
+        post_scale_ = 1 / scale;
+        setup_k (reso);
+
+        return;
+      }
     const float db_x2_factor = 0.166096404744368; // 1/(20*log(2)/log(10))
     const float sqrt2 = M_SQRT2;
 
@@ -161,7 +166,8 @@ public:
         reso = 1 - (1-0.9f)*(1-0.9f)*(1-sqrt2/4) + (reso-0.9f)*0.1f;
       }
 
-    set_scale (vol, std::max (1 / vol, 1.0f));
+    pre_scale_ = vol;
+    post_scale_ = std::max (1 / vol, 1.0f);
     setup_k (reso);
   }
   void
@@ -177,6 +183,7 @@ public:
         rtable_.lookup_resonance (res, mode2stages (mode_), &k_[0]);
       }
   }
+public:
   void
   set_mode (int m)
   {
@@ -191,6 +198,11 @@ public:
   set_drive (float drive)
   {
     drive_ = drive;
+  }
+  void
+  set_test_linear (bool test_linear)
+  {
+    test_linear_ = test_linear;
   }
   void
   reset ()
