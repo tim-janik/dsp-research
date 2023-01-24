@@ -377,11 +377,12 @@ private:
             FParams fparams_end = apply_reso_drive (reso_in ? reso_in[todo - 1] : reso_, drive_in ? drive_in[todo - 1] : drive_);
 
             constexpr static int STAGES = mode2stages (MODE);
-            float delta_pre_scale = (fparams_end.pre_scale - fparams.pre_scale) / n_samples;
-            float delta_post_scale = (fparams_end.post_scale - fparams.post_scale) / n_samples;
+            float todo_inv = 1.f / (todo - 1);
+            float delta_pre_scale = (fparams_end.pre_scale - fparams.pre_scale) * todo_inv;
+            float delta_post_scale = (fparams_end.post_scale - fparams.post_scale) * todo_inv;
             float delta_k[STAGES];
             for (int stage = 0; stage < STAGES; stage++)
-              delta_k[stage] = (fparams_end.k[stage] - fparams.k[stage]) / n_samples;
+              delta_k[stage] = (fparams_end.k[stage] - fparams.k[stage]) * todo_inv;
 
             uint j = 0;
             for (uint i = 0; i < todo * over_; i += over_)
