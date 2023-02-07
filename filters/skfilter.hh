@@ -132,8 +132,8 @@ public:
   {
     for (auto& channel : channels_)
       {
-        channel.res_up   = std::make_unique<Resampler2> (Resampler2::UP, over_, Resampler2::PREC_72DB, false, Resampler2::FILTER_IIR);
-        channel.res_down = std::make_unique<Resampler2> (Resampler2::DOWN, over_, Resampler2::PREC_72DB, false, Resampler2::FILTER_IIR);
+        channel.res_up   = std::make_unique<Resampler2> (Resampler2::UP, over_, Resampler2::PREC_72DB);
+        channel.res_down = std::make_unique<Resampler2> (Resampler2::DOWN, over_, Resampler2::PREC_72DB);
       }
     set_rate (48000);
     reset();
