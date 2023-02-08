@@ -265,7 +265,7 @@ private:
 
     return x * (c1 + c2 * x2) / (c3 + x2);
   }
-  template<int MODE, bool STEREO>
+  template<Mode MODE, bool STEREO>
   [[gnu::flatten]]
   void
   process (float *left, float *right, float freq, uint n_samples)
@@ -273,7 +273,7 @@ private:
     float g = cutoff_warp (freq); // FIXME: clamp freq
     float G = g / (1 + g);
 
-    for (int stage = 0; stage < mode2stages (Mode (MODE)); stage++)
+    for (int stage = 0; stage < mode2stages (MODE); stage++)
       {
         const float k = fparams_.k[stage];
 
@@ -294,7 +294,7 @@ private:
             float y1hp = y0 - y1;
             float y2hp = y1 - y2;
 
-            switch (Mode (MODE))
+            switch (MODE)
               {
                 case LP2:
                 case LP4:
@@ -364,7 +364,7 @@ private:
             if (STEREO) { right[i] = mode_out (y0r, y1r, y2r, last_stage) * post_scale; }
           };
 
-        const bool last_stage = mode2stages (Mode (MODE)) == (stage + 1);
+        const bool last_stage = mode2stages (MODE) == (stage + 1);
 
         if (last_stage)
           {
@@ -387,7 +387,7 @@ private:
           }
       }
   }
-  template<int MODE>
+  template<Mode MODE>
   void
   process_block_mode (uint n_samples, float *left, float *right, const float *freq_in, const float *reso_in, const float *drive_in)
   {
@@ -423,7 +423,7 @@ private:
             FParams fparams_end;
             setup_reso_drive (fparams_end, reso_in ? reso_in[todo - 1] : reso_, drive_in ? drive_in[todo - 1] : drive_);
 
-            constexpr static int STAGES = mode2stages (Mode (MODE));
+            constexpr static int STAGES = mode2stages (MODE);
             float todo_inv = 1.f / todo;
             float delta_pre_scale = (fparams_end.pre_scale - fparams_.pre_scale) * todo_inv;
             float delta_post_scale = (fparams_end.post_scale - fparams_.post_scale) * todo_inv;
@@ -498,13 +498,13 @@ private:
       channels_[1].res_down->process_block (over_samples_right, n_samples * over_, right);
   }
 
-  using ProcessBlockFunc = decltype (&SKFilter::process_block_mode<0>);
+  using ProcessBlockFunc = decltype (&SKFilter::process_block_mode<LP2>);
 
   template<size_t... INDICES>
   static constexpr std::array<ProcessBlockFunc, LAST_MODE + 1>
   make_jump_table (std::integer_sequence<size_t, INDICES...>)
   {
-    auto mk_func = [] (auto I) { return &SKFilter::process_block_mode<I.value>; };
+    auto mk_func = [] (auto I) { return &SKFilter::process_block_mode<Mode (I.value)>; };
 
     return { mk_func (std::integral_constant<int, INDICES>{})... };
   }
