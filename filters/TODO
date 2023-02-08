@@ -1,25 +1,9 @@
-- match laddervcf API
-
-  void set_freq() / set_freq_in()
-  void set_reso() / set_reso_in()
-  void set_drive() / set_drive_in()
-  void set_mix() / set_mix_in()
-
-  void tick (float *l, float *r, float freq, float reso, float drive, float mix);
-  void process_block (float *l, float *r, uint n_values);
-
 - laddervcf may need stack limit (like SKFilter)
-- resonance normalization?
-- freq/reso normalization?
-- multiple modes
-  ~ NOTCH
-- compare to / check in laddervcf.hh
-- normalize non-linearity output to [-1:1]
-- allow reso > 1 for slightly unstable filter
-- prescale should be reduced for increased reso
+- compare to laddervcf.hh
+- clamp freq range
+- double check reso / drive normalization
+  ~ prescale should be reduced for increased reso
   ~ make reso more audible for drive == 0dB
-- change drive range to 0..8 & x^3
-- support fast resonance changes (resonance tables for HP4|LP4)
-- test integration in SpectMorph
-- possibly use tanh approximation
-- possibly use SIMD instructions
+  ~ possibly change drive range to 0..8 & x^3
+  ~ allow reso > 1 for slightly unstable filter
+  ~ support reso > 1 for stages > 1
