@@ -335,8 +335,8 @@ private:
 
             if (last_stage)
               {
-                y0l = distort (y0l);
-                y0r = distort (y0r);
+                            { y0l = distort (y0l); }
+                if (STEREO) { y0r = distort (y0r); }
               }
                         { y1l = lowpass (y0l, s1l); }
             if (STEREO) { y1r = lowpass (y0r, s1r); }
