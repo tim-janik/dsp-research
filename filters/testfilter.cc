@@ -158,6 +158,19 @@ filter_partials_test (SKFilter& filter)
   return partials;
 }
 
+SKFilter::Mode
+skmode (const std::string& arg)
+{
+  vector<string> modes = { "lp1", "lp2", "lp3", "lp4", "lp6", "lp8", "bp2", "bp4", "bp6", "bp8", "hp1", "hp2", "hp3", "hp4", "hp6", "hp8" };
+  for (size_t i = 0; i < modes.size(); i++)
+    {
+      if (arg == modes[i])
+        return SKFilter::Mode (i);
+    }
+  printf ("unsupported filter mode: %s\n", arg.c_str());
+  exit (1);
+}
+
 int
 main (int argc, char **argv)
 {
@@ -182,7 +195,7 @@ main (int argc, char **argv)
             }
 
           SKFilter filter (/* oversample */ 4);
-          filter.set_mode (atoi (argv[2]));
+          filter.set_mode (skmode (argv[2]));
           filter.set_reso (0.95);
 
           const int block_size = 512;
@@ -227,7 +240,7 @@ main (int argc, char **argv)
       SKFilter filter (atoi (argv[3]));
 
       filter.set_test_linear (true);
-      filter.set_mode (atoi (argv[4]));
+      filter.set_mode (skmode (argv[4]));
       filter.set_reso (atof (argv[5]));
       filter.process_block (left.size(), left.data(), right.data(), freq.data());
 
@@ -277,11 +290,11 @@ main (int argc, char **argv)
       SKFilter filter2 (atoi (argv[3]));
 
       filter.set_test_linear (true);
-      filter.set_mode (atoi (argv[4]));
+      filter.set_mode (skmode (argv[4]));
       filter.set_reso (1 - R1);
 
       filter2.set_test_linear (true);
-      filter2.set_mode (atoi (argv[4]));
+      filter2.set_mode (skmode (argv[4]));
       filter2.set_reso (1 - R2);
 
       filter.process_block (left.size(), left.data(), right.data(), freq.data());
@@ -382,7 +395,7 @@ main (int argc, char **argv)
         }
 
       double last_reso = 0;
-      filter.set_mode (atoi (argv[2]));
+      filter.set_mode (skmode (argv[2]));
       filter.set_reso (last_reso);
 
       for (int b = 0; b + block_size <= len; b += block_size)
@@ -445,7 +458,7 @@ main (int argc, char **argv)
     {
       SKFilter filter (/* oversample */ 4);
 
-      filter.set_mode (atoi (argv[2]));
+      filter.set_mode (skmode (argv[2]));
       filter.set_reso (atof (argv[3]));
       filter.set_drive (atof (argv[4]));
 
@@ -462,7 +475,7 @@ main (int argc, char **argv)
         {
           SKFilter filter (/* oversample */ 4);
 
-          filter.set_mode (atoi (argv[2]));
+          filter.set_mode (skmode (argv[2]));
           filter.set_drive (atof (argv[3]));
           filter.set_reso (reso * 0.01);
 

@@ -8,7 +8,15 @@ using PandaResampler::Resampler2;
 
 class SKFilter
 {
-  int mode_ = 0;
+public:
+  enum Mode {
+    LP1, LP2, LP3, LP4, LP6, LP8,
+    BP2, BP4, BP6, BP8,
+    HP1, HP2, HP3, HP4, HP6, HP8
+  };
+private:
+  static constexpr size_t LAST_MODE = HP8;
+  Mode mode_ = Mode::LP2;
   float freq_ = 440;
   float reso_ = 0;
   float drive_ = 0;
@@ -34,16 +42,23 @@ class SKFilter
     float post_scale = 1;
   };
   static constexpr int
-  mode2stages (int mode)
+  mode2stages (Mode mode)
   {
-    if (mode > 10)
-      return 4;
-    if (mode > 7)
-      return 3;
-    else if (mode > 4)
-      return 2;
-    else
-      return 1;
+    switch (mode)
+    {
+      case LP3:
+      case LP4:
+      case BP4:
+      case HP3:
+      case HP4: return 2;
+      case LP6:
+      case BP6:
+      case HP6: return 3;
+      case LP8:
+      case BP8:
+      case HP8: return 4;
+      default:  return 1;
+    }
   }
 
   std::array<Channel, 2> channels_;
@@ -190,7 +205,7 @@ private:
   }
 public:
   void
-  set_mode (int m)
+  set_mode (Mode m)
   {
     mode_ = m;
     fparams_valid_ = false;
@@ -258,7 +273,7 @@ private:
     float g = cutoff_warp (freq); // FIXME: clamp freq
     float G = g / (1 + g);
 
-    for (int stage = 0; stage < mode2stages (MODE); stage++)
+    for (int stage = 0; stage < mode2stages (Mode (MODE)); stage++)
       {
         const float k = fparams_.k[stage];
 
@@ -274,29 +289,30 @@ private:
             return y;
           };
 
-        auto mode_out = [] (float y0, float y1, float y2) -> float
+        auto mode_out = [] (float y0, float y1, float y2, bool last_stage) -> float
           {
             float y1hp = y0 - y1;
             float y2hp = y1 - y2;
 
-            switch (MODE)
+            switch (Mode (MODE))
               {
-                case 0: return y2;
-                case 1: return y2hp;
-                case 2: return (y1hp - y2hp);
-                case 3: return y1;
-                case 4: return y1hp;
-                case 5: return y2;
-                case 6: return y2hp;
-                case 7: return (y1hp - y2hp);
-                case 8: return y2;
-                case 9: return y2hp;
-                case 10: return (y1hp - y2hp);
-                case 11: return y2;
-                case 12: return y2hp;
-                case 13: return (y1hp - y2hp);
-                default: return 0;
-              }
+                case LP2:
+                case LP4:
+                case LP6:
+                case LP8: return y2;
+                case BP2:
+                case BP4:
+                case BP6:
+                case BP8: return y2hp;
+                case HP2:
+                case HP4:
+                case HP6:
+                case HP8: return (y1hp - y2hp);
+                case LP1:
+                case LP3: return last_stage ? y1 : y2;
+                case HP1:
+                case HP3: return last_stage ? y1hp : (y1hp - y2hp);
+             }
           };
 
         auto distort = [] (float x)
@@ -344,11 +360,11 @@ private:
                         { y2l = lowpass (y1l, s2l); }
             if (STEREO) { y2r = lowpass (y1r, s2r); }
 
-                        { left[i]  = mode_out (y0l, y1l, y2l) * post_scale; }
-            if (STEREO) { right[i] = mode_out (y0r, y1r, y2r) * post_scale; }
+                        { left[i]  = mode_out (y0l, y1l, y2l, last_stage) * post_scale; }
+            if (STEREO) { right[i] = mode_out (y0r, y1r, y2r, last_stage) * post_scale; }
           };
 
-        const bool last_stage = mode2stages (MODE) == (stage + 1);
+        const bool last_stage = mode2stages (Mode (MODE)) == (stage + 1);
 
         if (last_stage)
           {
@@ -407,7 +423,7 @@ private:
             FParams fparams_end;
             setup_reso_drive (fparams_end, reso_in ? reso_in[todo - 1] : reso_, drive_in ? drive_in[todo - 1] : drive_);
 
-            constexpr static int STAGES = mode2stages (MODE);
+            constexpr static int STAGES = mode2stages (Mode (MODE));
             float todo_inv = 1.f / todo;
             float delta_pre_scale = (fparams_end.pre_scale - fparams_.pre_scale) * todo_inv;
             float delta_post_scale = (fparams_end.post_scale - fparams_.post_scale) * todo_inv;
@@ -483,7 +499,6 @@ private:
   }
 
   using ProcessBlockFunc = decltype (&SKFilter::process_block_mode<0>);
-  static constexpr size_t LAST_MODE = 13;
 
   template<size_t... INDICES>
   static constexpr std::array<ProcessBlockFunc, LAST_MODE + 1>
