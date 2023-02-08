@@ -251,6 +251,7 @@ private:
     return x * (c1 + c2 * x2) / (c3 + x2);
   }
   template<int MODE, bool STEREO>
+  [[gnu::flatten]]
   void
   process (float *left, float *right, float freq, uint n_samples)
   {
@@ -306,7 +307,7 @@ private:
             return x - x * x * x * (1.0f / 3);
           };
 
-        float s1l, s1r, s2l, s2r, xl, xr, y0l, y0r, y1l, y1r, y2l, y2r;
+        float s1l, s1r, s2l, s2r;
 
         s1l = channels_[0].s1[stage];
         s2l = channels_[0].s2[stage];
@@ -317,27 +318,47 @@ private:
             s2r = channels_[1].s2[stage];
           }
 
-        for (uint i = 0; i < n_samples; i++)
+        auto tick = [&] (uint i, bool last_stage, float pre_scale, float post_scale)
           {
+            float xl, xr, y0l, y0r, y1l, y1r, y2l, y2r;
+
             /*
              * interleaving processing of both channels performs better than
              * processing left and right channel seperately (measured on Ryzen7)
              */
 
-                        { xl = left[i]  * fparams_.pre_scale; }
-            if (STEREO) { xr = right[i] * fparams_.pre_scale; }
+                        { xl = left[i] * pre_scale; }
+            if (STEREO) { xr = right[i] * pre_scale; }
 
-                        { y0l = distort (xl * xnorm + s1l * s1feedback + s2l * s2feedback); }
-            if (STEREO) { y0r = distort (xr * xnorm + s1r * s1feedback + s2r * s2feedback); }
+                        { y0l = xl * xnorm + s1l * s1feedback + s2l * s2feedback; }
+            if (STEREO) { y0r = xr * xnorm + s1r * s1feedback + s2r * s2feedback; }
 
+            if (last_stage)
+              {
+                y0l = distort (y0l);
+                y0r = distort (y0r);
+              }
                         { y1l = lowpass (y0l, s1l); }
             if (STEREO) { y1r = lowpass (y0r, s1r); }
 
                         { y2l = lowpass (y1l, s2l); }
             if (STEREO) { y2r = lowpass (y1r, s2r); }
 
-                        { left[i]  = mode_out (y0l, y1l, y2l) * fparams_.post_scale; }
-            if (STEREO) { right[i] = mode_out (y0r, y1r, y2r) * fparams_.post_scale; }
+                        { left[i]  = mode_out (y0l, y1l, y2l) * post_scale; }
+            if (STEREO) { right[i] = mode_out (y0r, y1r, y2r) * post_scale; }
+          };
+
+        const bool last_stage = mode2stages (MODE) == (stage + 1);
+
+        if (last_stage)
+          {
+            for (uint i = 0; i < n_samples; i++)
+              tick (i, true, fparams_.pre_scale, fparams_.post_scale);
+          }
+        else
+          {
+            for (uint i = 0; i < n_samples; i++)
+              tick (i, false, 1, 1);
           }
 
         channels_[0].s1[stage] = s1l;

@@ -15,7 +15,6 @@
   ~ NOTCH
   ~ possibly: HP3 LP3 LP6|8 HP6|8 BP6|8
   ~ mode API should have enum
-  ~ 2nd order filters should only have one non-linearity
 - compare to / check in laddervcf.hh
 - normalize non-linearity output to [-1:1]
 - allow reso > 1 for slightly unstable filter
