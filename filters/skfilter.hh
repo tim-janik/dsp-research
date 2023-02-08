@@ -23,6 +23,11 @@ private:
   bool test_linear_ = false;
   int over_ = 1;
   float freq_warp_factor_ = 0;
+  float frequency_range_min_ = 0;
+  float frequency_range_max_ = 0;
+  float clamp_freq_min_ = 0;
+  float clamp_freq_max_ = 0;
+  float rate_ = 0;
 
   static constexpr int MAX_STAGES = 4;
   static constexpr uint MAX_BLOCK_SIZE = 1024;
@@ -153,6 +158,7 @@ public:
         channel.res_down = std::make_unique<Resampler2> (Resampler2::DOWN, over_, Resampler2::PREC_72DB);
       }
     set_rate (48000);
+    set_frequency_range (10, 24000);
     reset();
   }
 private:
@@ -249,8 +255,28 @@ public:
   set_rate (float rate)
   {
     freq_warp_factor_ = 4 / (rate * over_);
+    rate_ = rate;
+
+    update_frequency_range();
+  }
+  void
+  set_frequency_range (float min_freq, float max_freq)
+  {
+    frequency_range_min_ = min_freq;
+    frequency_range_max_ = max_freq;
+
+    update_frequency_range();
   }
 private:
+  void
+  update_frequency_range()
+  {
+    /* we want to clamp to the user defined range (set_frequency_range())
+     * but also enforce that the filter is well below nyquist frequency
+     */
+    clamp_freq_min_ = frequency_range_min_;
+    clamp_freq_max_ = std::min (frequency_range_max_, rate_ * over_ * 0.49f);
+  }
   float
   cutoff_warp (float freq)
   {
@@ -270,7 +296,7 @@ private:
   void
   process (float *left, float *right, float freq, uint n_samples)
   {
-    float g = cutoff_warp (freq); // FIXME: clamp freq
+    float g = cutoff_warp (std::clamp (freq, clamp_freq_min_, clamp_freq_max_));
     float G = g / (1 + g);
 
     for (int stage = 0; stage < mode2stages (MODE); stage++)

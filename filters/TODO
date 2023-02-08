@@ -1,6 +1,5 @@
 - laddervcf may need stack limit (like SKFilter)
 - compare to laddervcf.hh
-- clamp freq range
 - double check reso / drive normalization
   ~ prescale should be reduced for increased reso
   ~ make reso more audible for drive == 0dB
