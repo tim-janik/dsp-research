@@ -177,6 +177,13 @@ private:
     const float db_x2_factor = 0.166096404744368; // 1/(20*log(2)/log(10))
     const float sqrt2 = M_SQRT2;
 
+    // scale signal down (without normalization on output) for negative drive
+    float negative_drive_vol = 1;
+    if (drive < 0)
+      {
+        negative_drive_vol = exp2f (drive * db_x2_factor);
+        drive = 0;
+      }
     // drive resonance boost
     if (drive > 0)
       reso += drive * 0.015f;
@@ -192,7 +199,7 @@ private:
         reso = 1 - (1-0.9f)*(1-0.9f)*(1-sqrt2/4) + (reso-0.9f)*0.1f;
       }
 
-    fparams.pre_scale = vol;
+    fparams.pre_scale = negative_drive_vol * vol;
     fparams.post_scale = std::max (1 / vol, 1.0f);
     setup_k (fparams, reso);
   }
