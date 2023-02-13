@@ -144,6 +144,9 @@ private:
 
       if (stages == 4)
         interpolate_resonance (res, stages, k, res4_k);
+
+      if (res > 1)
+        k[stages - 1] = res * 2;
     }
   };
   const RTable& rtable_;

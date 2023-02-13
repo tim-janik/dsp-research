@@ -1,8 +1,3 @@
 - laddervcf may need stack limit (like SKFilter)
 - compare to laddervcf.hh
 - double check reso / drive normalization
-  ~ prescale should be reduced for increased reso
-  ~ make reso more audible for drive == 0dB
-  ~ possibly change drive range to 0..8 & x^3
-  ~ allow reso > 1 for slightly unstable filter
-  ~ support reso > 1 for stages > 1
