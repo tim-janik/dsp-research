@@ -1,5 +1,5 @@
 - laddervcf may need stack limit (like SKFilter)
 - compare to laddervcf.hh
 - double check reso / drive normalization
-- latency compensation (blepsynth / SpectMorph)
+- latency compensation (SpectMorph, blepsynth/LadderVCF)
 - asymmetric saturation
