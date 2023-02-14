@@ -400,7 +400,7 @@ main (int argc, char **argv)
 
       for (int b = 0; b + block_size <= len; b += block_size)
         {
-          double reso = ((float)rand() / RAND_MAX);
+          double reso = ((double) rand() / RAND_MAX);
           reso = 1 - reso * reso;
 
           float reso_in[block_size];
