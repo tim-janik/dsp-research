@@ -1,6 +1,5 @@
 - laddervcf may need stack limit (like SKFilter)
 - compare to laddervcf.hh
 - double check reso / drive normalization
-- ensure state reset on mode change
 - latency compensation (blepsynth / SpectMorph)
 - asymmetric saturation
