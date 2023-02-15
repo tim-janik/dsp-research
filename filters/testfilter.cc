@@ -252,10 +252,10 @@ lsweep (Ladder& vcf, double freq, double res)
 
 template<class Ladder> void
 ladder_perf (const char *label,
-           bool          need_left = true,
-           bool          need_right = true,
+           bool          stereo = true,
            const float  *freq_in = nullptr,
-           const float  *reso_in = nullptr)
+           const float  *reso_in = nullptr,
+           const float  *drive_in = nullptr)
 {
   vector<float> lsamples (48000 * 5);
   for (auto& s : lsamples)
@@ -273,7 +273,7 @@ ladder_perf (const char *label,
       while (i < lsamples.size())
         {
           size_t n_samples = min<size_t> (lsamples.size() - i, 1024);
-          vcf.run_block (n_samples, lsamples.data(), rsamples.data(), freq_in, reso_in);
+          vcf.run_block (n_samples, lsamples.data(), stereo ? rsamples.data() : nullptr, freq_in, reso_in, drive_in);
           i += n_samples;
         }
     }
@@ -288,14 +288,16 @@ ladder_perf_streams()
 {
   vector<float> freq_in (1024, 440.0);
   vector<float> reso_in (1024, 0.9);
+  vector<float> drive_in (1024, 10);
 
   ladder_perf<LadderVCFNonLinear> ("nl-none");
-  ladder_perf<LadderVCFNonLinear> ("nl-f",          true,  true,   &freq_in[0], nullptr);
-  ladder_perf<LadderVCFNonLinear> ("nl-f+r",        true,  true,   &freq_in[0], &reso_in[0]);
-  ladder_perf<LadderVCFNonLinear> ("nl-f+r",        true,  true,   &freq_in[0], &reso_in[0]);
-  ladder_perf<LadderVCFNonLinear> ("nl-mono-none",  true,  false);
-  ladder_perf<LadderVCFNonLinear> ("nl-mono-f",     true,  false,  &freq_in[0], nullptr);
-  ladder_perf<LadderVCFNonLinear> ("nl-mono-f+r",   true,  false,  &freq_in[0], &reso_in[0]);
+  ladder_perf<LadderVCFNonLinear> ("nl-f",          true,  &freq_in[0], nullptr);
+  ladder_perf<LadderVCFNonLinear> ("nl-f+r",        true,  &freq_in[0], &reso_in[0]);
+  ladder_perf<LadderVCFNonLinear> ("nl-f+r+d",      true,  &freq_in[0], &reso_in[0], &drive_in[0]);
+  ladder_perf<LadderVCFNonLinear> ("nl-mono-none",  false);
+  ladder_perf<LadderVCFNonLinear> ("nl-mono-f",     false, &freq_in[0], nullptr);
+  ladder_perf<LadderVCFNonLinear> ("nl-mono-f+r",   false, &freq_in[0], &reso_in[0]);
+  ladder_perf<LadderVCFNonLinear> ("nl-mono-f+r+d", false, &freq_in[0], &reso_in[0], &drive_in[0]);
 }
 
 
