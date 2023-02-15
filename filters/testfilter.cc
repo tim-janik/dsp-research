@@ -11,6 +11,7 @@
 
 using std::string;
 using std::vector;
+using std::min;
 
 using namespace SpectMorph; // LadderVCF
 
@@ -240,6 +241,57 @@ lsweep (Ladder& vcf, double freq, double res)
   test (samples);
 }
 
+template<class Ladder> void
+ladder_perf (const char *label,
+           bool          need_left = true,
+           bool          need_right = true,
+           const float  *freq_in = nullptr,
+           const float  *reso_in = nullptr)
+{
+  vector<float> lsamples (48000 * 5);
+  for (auto& s : lsamples)
+    s = (rand() * (1.0 / RAND_MAX) - 0.5) * 2;
+  vector<float > rsamples = lsamples;
+
+  constexpr int    n_runs = 20;
+  constexpr double fc     = 500. / 24000.;
+  constexpr double res    = 0.75;
+  const double start_t = get_time();
+  for (int runs = 0; runs < n_runs; runs++)
+    {
+      Ladder vcf;
+      size_t i = 0;
+      while (i < lsamples.size())
+        {
+          size_t n_samples = min<size_t> (lsamples.size() - i, 1024);
+          const float *inputs[2] = { (const float *) &lsamples[i], &rsamples[i] };
+          float *outputs[2] = { &lsamples[i], &rsamples[i] };
+          vcf.run_block (n_samples, fc, res, inputs, outputs, need_left, need_right, freq_in, reso_in);
+          i += n_samples;
+        }
+    }
+  const double t = (get_time() - start_t) / n_runs;
+  printf ("%s: %f ns/sample\n", label, t / (lsamples.size() * 2) * 1e9);
+  printf ("%s: %f stereo streams @ 48kHz\n", label, 1.0 / (t * 48000 / lsamples.size()));
+  printf ("\n");
+}
+
+void
+ladder_perf_streams()
+{
+  vector<float> freq_in (1024, 440.0);
+  vector<float> reso_in (1024, 0.9);
+
+  ladder_perf<LadderVCFNonLinear> ("nl-none");
+  ladder_perf<LadderVCFNonLinear> ("nl-f",          true,  true,   &freq_in[0], nullptr);
+  ladder_perf<LadderVCFNonLinear> ("nl-f+r",        true,  true,   &freq_in[0], &reso_in[0]);
+  ladder_perf<LadderVCFNonLinear> ("nl-f+r",        true,  true,   &freq_in[0], &reso_in[0]);
+  ladder_perf<LadderVCFNonLinear> ("nl-mono-none",  true,  false);
+  ladder_perf<LadderVCFNonLinear> ("nl-mono-f",     true,  false,  &freq_in[0], nullptr);
+  ladder_perf<LadderVCFNonLinear> ("nl-mono-f+r",   true,  false,  &freq_in[0], &reso_in[0]);
+}
+
+
 int
 main (int argc, char **argv)
 {
@@ -253,10 +305,10 @@ main (int argc, char **argv)
 
   if (argc == 3 && cmd == "perf")
     {
-      for (int test = 0; test < 3; test++)
+      for (int test = 0; test < 6; test++)
         {
-          int r, f;
-          switch (test)
+          int r, f, mono = test / 3;
+          switch (test % 3)
             {
               case 0: r = 0; f = 0; break;
               case 1: r = 0; f = 1; break;
@@ -281,14 +333,14 @@ main (int argc, char **argv)
 
           const int blocks = 10 * 1000;
           for (int b = 0; b < blocks; b++)
-            filter.process_block (block_size, left, right, f ? freq : nullptr, r ? reso : nullptr);
+            filter.process_block (block_size, left, mono ? nullptr : right, f ? freq : nullptr, r ? reso : nullptr);
 
           double end_t = get_time();
           double ns_per_sec = 1e9;
           double ns_per_sample = ns_per_sec * (end_t - start_t) / (blocks * block_size);
 
-          printf ("with freq=%d reso=%d: ns/sample %f\n", f, r, ns_per_sample);
-          printf ("                   bogopolyphony = %f\n\n", 1e9 / (ns_per_sample * 48000));
+          printf ("with mono=%d freq=%d reso=%d: ns/sample %f\n", mono, f, r, ns_per_sample);
+          printf ("                              bogopolyphony = %f\n\n", 1e9 / (ns_per_sample * 48000));
         }
     }
   if (argc == 6 && cmd == "sweep") // <freq> <over> <mode> <res>
@@ -567,5 +619,16 @@ main (int argc, char **argv)
       LadderVCFNonLinear vcf;
       vcf.set_scale (0.01, 100);
       lsweep (vcf, atof (argv[2]), atof (argv[3]));
+    }
+  if (argc == 2 && strcmp (argv[1], "lperf") == 0)
+    {
+      ladder_perf<LadderVCFRef>("LadderVCFRef");
+      ladder_perf<LadderVCFLinear>("LadderVCFLinear");
+      ladder_perf<LadderVCFNonLinear>("MoogVCFNonLinear");
+      ladder_perf<LadderVCFNonLinearCheap>("MoogVCFNonLinearCheap");
+    }
+  if (argc == 2 && strcmp (argv[1], "lperfs") == 0)
+    {
+      ladder_perf_streams();
     }
 }
