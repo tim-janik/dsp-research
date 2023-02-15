@@ -16,16 +16,16 @@ template<bool OVERSAMPLE, bool NON_LINEAR>
 class LadderVCF
 {
   struct Channel {
-    double x1, x2, x3, x4;
-    double y1, y2, y3, y4;
+    float x1, x2, x3, x4;
+    float y1, y2, y3, y4;
 
     Resampler2 res_up   { Resampler2::UP,   2, Resampler2::PREC_72DB };
     Resampler2 res_down { Resampler2::DOWN, 2, Resampler2::PREC_72DB };
   };
   std::array<Channel, 2> channels;
   LadderVCFMode mode;
-  double pre_scale, post_scale;
-  double rate;
+  float pre_scale, post_scale;
+  float rate;
   float freq_ = 440;
   float reso_ = 0;
   float drive_ = 0;
@@ -65,7 +65,7 @@ public:
     post_scale = post;
   }
   void
-  set_rate (double r)
+  set_rate (float r)
   {
     rate = r;
   }
@@ -81,15 +81,15 @@ public:
         c.res_down.reset();
       }
   }
-  double
-  distort (double x)
+  float
+  distort (float x)
   {
     if (NON_LINEAR)
       {
         /* shaped somewhat similar to tanh() and others, but faster */
-        x = std::clamp (x, -1.0, 1.0);
+        x = std::clamp (x, -1.0f, 1.0f);
 
-        return x - x * x * x * (1.0 / 3);
+        return x - x * x * x * (1.0f / 3);
       }
     else
       {
@@ -110,12 +110,13 @@ private:
    * Computer Music Journal. 30. 19-31. 10.1162/comj.2006.30.2.19.
    */
   template<LadderVCFMode MODE, bool STEREO> inline void
-  run (float *left, float *right, double fc, double res)
+  run (float *left, float *right, float fc, float res)
   {
-    fc = M_PI * fc;
-    const double g = 0.9892 * fc - 0.4342 * fc * fc + 0.1381 * fc * fc * fc - 0.0202 * fc * fc * fc * fc;
+    const float pi = M_PI;
+    fc = pi * fc;
+    const float g = 0.9892f * fc - 0.4342f * fc * fc + 0.1381f * fc * fc * fc - 0.0202f * fc * fc * fc * fc;
 
-    res *= 1.0029 + 0.0526 * fc - 0.0926 * fc * fc + 0.0218 * fc * fc * fc;
+    res *= 1.0029f + 0.0526f * fc - 0.0926f * fc * fc + 0.0218f * fc * fc * fc;
 
     constexpr uint oversample_count = OVERSAMPLE ? 2 : 1;
     for (uint os = 0; os < oversample_count; os++)
@@ -125,20 +126,20 @@ private:
             float &value = i == 0 ? left[os] : right[os];
 
             Channel& c = channels[i];
-            const double x = value * pre_scale;
-            const double g_comp = 0.5; // passband gain correction
-            const double x0 = distort (x - (c.y4 - g_comp * x) * res * 4);
+            const float x = value * pre_scale;
+            const float g_comp = 0.5f; // passband gain correction
+            const float x0 = distort (x - (c.y4 - g_comp * x) * res * 4);
 
-            c.y1 = (x0 * (1 / 1.3) + c.x1 * (0.3 / 1.3) - c.y1) * g + c.y1;
+            c.y1 = (x0 * (1 / 1.3f) + c.x1 * (0.3f / 1.3f) - c.y1) * g + c.y1;
             c.x1 = x0;
 
-            c.y2 = (c.y1 * (1 / 1.3) + c.x2 * (0.3 / 1.3) - c.y2) * g + c.y2;
+            c.y2 = (c.y1 * (1 / 1.3f) + c.x2 * (0.3f / 1.3f) - c.y2) * g + c.y2;
             c.x2 = c.y1;
 
-            c.y3 = (c.y2 * (1 / 1.3) + c.x3 * (0.3 / 1.3) - c.y3) * g + c.y3;
+            c.y3 = (c.y2 * (1 / 1.3f) + c.x3 * (0.3f / 1.3f) - c.y3) * g + c.y3;
             c.x3 = c.y2;
 
-            c.y4 = (c.y3 * (1 / 1.3) + c.x4 * (0.3 / 1.3) - c.y4) * g + c.y4;
+            c.y4 = (c.y3 * (1 / 1.3f) + c.x4 * (0.3f / 1.3f) - c.y4) * g + c.y4;
             c.x4 = c.y3;
 
             switch (MODE)
@@ -181,13 +182,13 @@ private:
           channels[1].res_up.process_block (right, n_samples, over_samples_right);
       }
 
-    double fc = freq_ * freq_scale / nyquist;
-    double res = reso_;
+    float fc = freq_ * freq_scale / nyquist;
+    float res = reso_;
 
     for (uint i = 0; i < n_samples; i++)
       {
-        double mod_fc = fc;
-        double mod_res = res;
+        float mod_fc = fc;
+        float mod_res = res;
 
         if (freq_in)
           mod_fc = freq_in[i] * freq_scale / nyquist;
@@ -195,8 +196,8 @@ private:
         if (reso_in)
           mod_res = reso_in[i];
 
-        mod_fc  = std::clamp (mod_fc, 0.0, 1.0);
-        mod_res = std::clamp (mod_res, 0.0, 1.0);
+        mod_fc  = std::clamp<float> (mod_fc, 0.0f, 1.0f);
+        mod_res = std::clamp<float> (mod_res, 0.0f, 1.0f);
 
         if (OVERSAMPLE)
           {
