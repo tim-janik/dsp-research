@@ -12,6 +12,8 @@
 using std::string;
 using std::vector;
 
+using namespace SpectMorph; // LadderVCF
+
 static inline float
 db_from_complex (float re, float im, float min_dB)
 {
@@ -169,6 +171,73 @@ skmode (const std::string& arg)
     }
   printf ("unsupported filter mode: %s\n", arg.c_str());
   exit (1);
+}
+
+struct LadderVCFRef
+{
+  struct Channel
+  {
+    struct LP {
+      double a = 0;
+      double b = 0;
+
+      void
+      tick (double in, double g)
+      {
+        double tmp = 1 / 1.3 * in + a * 0.3 / 1.3;
+        b = b + (tmp - b) * g;
+        a = in;
+      }
+    };
+
+    LP lps[4];
+
+    double
+    run (double input, double fc, double res)
+    {
+      fc = M_PI * fc;
+      const double g = 0.9892 * fc - 0.4342 * fc * fc + 0.1381 * fc * fc * fc - 0.0202 * fc * fc * fc * fc;
+      res *= 1.0029 + 0.0526 * fc - 0.0926 * fc * fc + 0.0218 * fc * fc * fc;
+
+      double g_comp = 0.5;
+      lps[0].tick (input - (lps[3].b - g_comp * input) * res * 4, g);
+      lps[1].tick (lps[0].b, g);
+      lps[2].tick (lps[1].b, g);
+      lps[3].tick (lps[2].b, g);
+      return lps[3].b;
+    }
+  } channels[2];
+
+  void
+  run_block (size_t         n_samples,
+             double         fc,
+             double         res,
+             const float  **inputs,
+             float        **outputs,
+             bool           need_left,
+             bool           need_right,
+             const float   *freq_in,
+             const float   *reso_in)
+  {
+    for (size_t i = 0; i < n_samples; i++)
+      {
+        for (int c : { 0, 1 })
+          outputs[c][i] = channels[c].run (inputs[c][i], fc, res);
+      }
+  }
+};
+
+template<class Ladder> void
+lsweep (Ladder& vcf, double freq, double res)
+{
+  vector<float> samples = gen();
+  for (size_t i = 0; i < samples.size(); i += 2)
+    {
+      const float *inputs[2]  = { &samples[i], &samples[i + 1] };
+      float       *outputs[2] = { &samples[i], &samples[i + 1] };
+      vcf.run_block (1, freq/24000., res, inputs, outputs, true, true, nullptr, nullptr);
+    }
+  test (samples);
 }
 
 int
@@ -482,5 +551,21 @@ main (int argc, char **argv)
           auto partials = filter_partials_test (filter);
           printf ("%d %f\n", reso, db (partials[5000 / 200]));
         }
+    }
+  if (argc == 4 && strcmp (argv[1], "ls-ref") == 0) // <freq> <res>
+    {
+      LadderVCFRef vcf;
+      lsweep (vcf, atof (argv[2]), atof (argv[3]));
+    }
+  if (argc == 4 && strcmp (argv[1], "ls") == 0) // <freq> <res>
+    {
+      LadderVCFLinear vcf;
+      lsweep (vcf, atof (argv[2]), atof (argv[3]));
+    }
+  if (argc == 4 && strcmp (argv[1], "ls-nl") == 0) // <freq> <res>
+    {
+      LadderVCFNonLinear vcf;
+      vcf.set_scale (0.01, 100);
+      lsweep (vcf, atof (argv[2]), atof (argv[3]));
     }
 }
