@@ -209,21 +209,32 @@ struct LadderVCFRef
     }
   } channels[2];
 
+  float freq_ = 440;
+  float reso_ = 0;
+
+  void
+  set_freq (float freq)
+  {
+    freq_ = freq;
+  }
+  void
+  set_reso (float reso)
+  {
+    reso_ = reso;
+  }
   void
   run_block (size_t         n_samples,
-             double         fc,
-             double         res,
-             const float  **inputs,
-             float        **outputs,
-             bool           need_left,
-             bool           need_right,
-             const float   *freq_in,
-             const float   *reso_in)
+             float         *left,
+             float         *right,
+             const float   *freq_in = nullptr,
+             const float   *reso_in = nullptr)
   {
+    double fc = freq_ / 24000.;
+    double res = reso_;
     for (size_t i = 0; i < n_samples; i++)
       {
-        for (int c : { 0, 1 })
-          outputs[c][i] = channels[c].run (inputs[c][i], fc, res);
+        left[i]  = channels[0].run (left[i], fc, res);
+        right[i] = channels[1].run (right[i], fc, res);
       }
   }
 };
@@ -232,12 +243,10 @@ template<class Ladder> void
 lsweep (Ladder& vcf, double freq, double res)
 {
   vector<float> samples = gen();
+  vcf.set_freq (freq);
+  vcf.set_reso (res);
   for (size_t i = 0; i < samples.size(); i += 2)
-    {
-      const float *inputs[2]  = { &samples[i], &samples[i + 1] };
-      float       *outputs[2] = { &samples[i], &samples[i + 1] };
-      vcf.run_block (1, freq/24000., res, inputs, outputs, true, true, nullptr, nullptr);
-    }
+    vcf.run_block (1, &samples[i], &samples[i + 1]);
   test (samples);
 }
 
@@ -251,27 +260,25 @@ ladder_perf (const char *label,
   vector<float> lsamples (48000 * 5);
   for (auto& s : lsamples)
     s = (rand() * (1.0 / RAND_MAX) - 0.5) * 2;
-  vector<float > rsamples = lsamples;
+  vector<float> rsamples = lsamples;
 
   constexpr int    n_runs = 20;
-  constexpr double fc     = 500. / 24000.;
-  constexpr double res    = 0.75;
   const double start_t = get_time();
   for (int runs = 0; runs < n_runs; runs++)
     {
       Ladder vcf;
+      vcf.set_freq (500);
+      vcf.set_reso (0.75);
       size_t i = 0;
       while (i < lsamples.size())
         {
           size_t n_samples = min<size_t> (lsamples.size() - i, 1024);
-          const float *inputs[2] = { (const float *) &lsamples[i], &rsamples[i] };
-          float *outputs[2] = { &lsamples[i], &rsamples[i] };
-          vcf.run_block (n_samples, fc, res, inputs, outputs, need_left, need_right, freq_in, reso_in);
+          vcf.run_block (n_samples, lsamples.data(), rsamples.data(), freq_in, reso_in);
           i += n_samples;
         }
     }
   const double t = (get_time() - start_t) / n_runs;
-  printf ("%s: %f ns/sample\n", label, t / (lsamples.size() * 2) * 1e9);
+  printf ("%s: %f ns/sample\n", label, t / lsamples.size() * 1e9);
   printf ("%s: %f stereo streams @ 48kHz\n", label, 1.0 / (t * 48000 / lsamples.size()));
   printf ("\n");
 }
@@ -430,31 +437,27 @@ main (int argc, char **argv)
 
       test (out);
     }
-  if (argc == 5 && cmd == "ldsweep")
+  if (argc == 5 && cmd == "ldsweep") // <freq> <mode> <reso>
     {
       vector<float> left;
       vector<float> right;
-      vector<float> freq;
       vector<float> samples = gen();
 
-      const float xfreq = atof (argv[2]);
       for (size_t i = 0; i < samples.size() / 2; i++)
         {
           left.push_back (samples[i * 2]);
           right.push_back (samples[i * 2 + 1]);
-          freq.push_back (xfreq);
         }
 
       SpectMorph::LadderVCFNonLinear filter;
       filter.set_mode (SpectMorph::LadderVCFMode (atoi (argv[3])));
+      filter.set_freq (atof (argv[2]));
+      filter.set_reso (atof (argv[4]));
 
       /* test how the filter behaves as a linear filter (without distortion) */
       float pre_scale = 0.001;
       filter.set_scale (pre_scale, 1 / pre_scale);
-
-      const float *inputs[2] = { left.data(), right.data() };
-      float *outputs[2] = { left.data(), right.data() };
-      filter.run_block (left.size(), 0, atof (argv[4]), inputs, outputs, true, true, freq.data(), nullptr);
+      filter.run_block (left.size(), left.data(), right.data());
 
       vector<float> out;
       for (size_t i = 0; i < left.size(); i++)
