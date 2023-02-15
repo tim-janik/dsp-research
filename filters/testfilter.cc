@@ -227,7 +227,8 @@ struct LadderVCFRef
              float         *left,
              float         *right,
              const float   *freq_in = nullptr,
-             const float   *reso_in = nullptr)
+             const float   *reso_in = nullptr,
+             const float   *drive_in = nullptr)
   {
     double fc = freq_ / 24000.;
     double res = reso_;
