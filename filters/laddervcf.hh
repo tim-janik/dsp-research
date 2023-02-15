@@ -26,8 +26,6 @@ class LadderVCF
   LadderVCFMode mode;
   double pre_scale, post_scale;
   double rate;
-  float        mix;
-  const float *mix_in;
   float freq_ = 440;
   float reso_ = 0;
   float drive_ = 0;
@@ -39,7 +37,6 @@ public:
     set_mode (LadderVCFMode::LP4);
     set_scale (1, 1);
     set_rate (48000);
-    set_mix (1);
   }
   void
   set_mode (LadderVCFMode new_mode)
@@ -71,17 +68,6 @@ public:
   set_rate (double r)
   {
     rate = r;
-  }
-  void
-  set_mix (float f)
-  {
-    mix = f;
-    mix_in = nullptr;
-  }
-  void
-  set_mix_in (const float *mix_values)
-  {
-    mix_in = mix_values;
   }
   void
   reset()
@@ -124,7 +110,7 @@ private:
    * Computer Music Journal. 30. 19-31. 10.1162/comj.2006.30.2.19.
    */
   template<LadderVCFMode MODE, bool STEREO> inline void
-  run (float *left, float *right, double fc, double res, double mix)
+  run (float *left, float *right, double fc, double res)
   {
     fc = M_PI * fc;
     const double g = 0.9892 * fc - 0.4342 * fc * fc + 0.1381 * fc * fc * fc - 0.0202 * fc * fc * fc * fc;
@@ -155,25 +141,23 @@ private:
             c.y4 = (c.y3 * (1 / 1.3) + c.x4 * (0.3 / 1.3) - c.y4) * g + c.y4;
             c.x4 = c.y3;
 
-            double out;
             switch (MODE)
               {
                 case LadderVCFMode::LP1:
-                  out = c.y1 * post_scale;
+                  value = c.y1 * post_scale;
                   break;
                 case LadderVCFMode::LP2:
-                  out = c.y2 * post_scale;
+                  value = c.y2 * post_scale;
                   break;
                 case LadderVCFMode::LP3:
-                  out = c.y3 * post_scale;
+                  value = c.y3 * post_scale;
                   break;
                 case LadderVCFMode::LP4:
-                  out = c.y4 * post_scale;
+                  value = c.y4 * post_scale;
                   break;
                 default:
                   assert (false);
               }
-            value = out * mix + value * (1 - mix);
           }
       }
   }
@@ -211,8 +195,6 @@ private:
         if (reso_in)
           mod_res = reso_in[i];
 
-        double mod_mix = mix_in ? mix_in[i] : mix; // caller needs to keep this in range [0;1]
-
         mod_fc  = std::clamp (mod_fc, 0.0, 1.0);
         mod_res = std::clamp (mod_res, 0.0, 1.0);
 
@@ -220,11 +202,11 @@ private:
           {
             const uint over_pos = i * 2;
 
-            run<MODE, STEREO> (over_samples_left + over_pos, over_samples_right + over_pos, mod_fc, mod_res, mod_mix);
+            run<MODE, STEREO> (over_samples_left + over_pos, over_samples_right + over_pos, mod_fc, mod_res);
           }
         else
           {
-            run<MODE, STEREO> (left + i, right + i, mod_fc, mod_res, mod_mix);
+            run<MODE, STEREO> (left + i, right + i, mod_fc, mod_res);
           }
       }
     if (OVERSAMPLE)
