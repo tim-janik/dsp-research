@@ -98,6 +98,12 @@ public:
       }
     fparams_valid_ = false;
   }
+  double
+  delay()
+  {
+    return channels[0].res_up->delay() / over_ + channels[0].res_down->delay();
+  }
+private:
   float
   distort (float x)
   {
@@ -106,7 +112,6 @@ public:
 
     return x - x * x * x * (1.0f / 3);
   }
-private:
   void
   setup_reso_drive (FParams& fparams, float reso, float drive)
   {
