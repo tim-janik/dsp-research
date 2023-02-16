@@ -36,6 +36,8 @@ class LadderVCF
   uint over_ = 0;
   bool test_linear_ = false;
 
+  static constexpr uint MAX_BLOCK_SIZE = 1024;
+
   struct FParams
   {
     float reso = 0;
@@ -330,17 +332,35 @@ public:
                  const float *reso_in = nullptr,
                  const float *drive_in = nullptr)
   {
-    switch (mode)
-    {
-      case LadderVCFMode::LP4: process_block_mode<LadderVCFMode::LP4> (n_samples, left, right, freq_in, reso_in, drive_in);
-                               break;
-      case LadderVCFMode::LP3: process_block_mode<LadderVCFMode::LP3> (n_samples, left, right, freq_in, reso_in, drive_in);
-                               break;
-      case LadderVCFMode::LP2: process_block_mode<LadderVCFMode::LP2> (n_samples, left, right, freq_in, reso_in, drive_in);
-                               break;
-      case LadderVCFMode::LP1: process_block_mode<LadderVCFMode::LP1> (n_samples, left, right, freq_in, reso_in, drive_in);
-                               break;
-    }
+    while (n_samples)
+      {
+        const uint todo = std::min (n_samples, MAX_BLOCK_SIZE);
+
+        switch (mode)
+          {
+            case LadderVCFMode::LP4: process_block_mode<LadderVCFMode::LP4> (todo, left, right, freq_in, reso_in, drive_in);
+                                     break;
+            case LadderVCFMode::LP3: process_block_mode<LadderVCFMode::LP3> (todo, left, right, freq_in, reso_in, drive_in);
+                                     break;
+            case LadderVCFMode::LP2: process_block_mode<LadderVCFMode::LP2> (todo, left, right, freq_in, reso_in, drive_in);
+                                     break;
+            case LadderVCFMode::LP1: process_block_mode<LadderVCFMode::LP1> (todo, left, right, freq_in, reso_in, drive_in);
+                                     break;
+          }
+
+        if (left)
+          left += todo;
+        if (right)
+          right += todo;
+        if (freq_in)
+          freq_in += todo;
+        if (reso_in)
+          reso_in += todo;
+        if (drive_in)
+          drive_in += todo;
+
+        n_samples -= todo;
+      }
   }
 };
 

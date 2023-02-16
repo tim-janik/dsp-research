@@ -1,4 +1,3 @@
-- laddervcf may need stack limit (like SKFilter)
 - compare to laddervcf.hh
 - double check reso / drive normalization
 - latency compensation (SpectMorph)

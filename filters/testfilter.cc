@@ -107,6 +107,19 @@ test (const vector<float>& samples)
     }
 }
 
+void
+test (const vector<float>& left, const vector<float>& right)
+{
+  vector<float> out;
+  for (size_t i = 0; i < left.size(); i++)
+    {
+      out.push_back (left[i]);
+      out.push_back (right[i]);
+    }
+
+  test (out);
+}
+
 vector<float>
 filter_partials_test (SKFilter& filter)
 {
@@ -375,14 +388,7 @@ main (int argc, char **argv)
       filter.set_reso (atof (argv[5]));
       filter.process_block (left.size(), left.data(), right.data(), freq.data());
 
-      vector<float> out;
-      for (size_t i = 0; i < left.size(); i++)
-        {
-          out.push_back (left[i]);
-          out.push_back (right[i]);
-        }
-
-      test (out);
+      test (left, right);
     }
   if (argc == 6 && cmd == "4pole") // <freq> <over> <mode> <res>
     {
@@ -431,14 +437,7 @@ main (int argc, char **argv)
       filter.process_block (left.size(), left.data(), right.data(), freq.data());
       filter2.process_block (left.size(), left.data(), right.data(), freq.data());
 
-      vector<float> out;
-      for (size_t i = 0; i < left.size(); i++)
-        {
-          out.push_back (left[i]);
-          out.push_back (right[i]);
-        }
-
-      test (out);
+      test (left, right);
     }
   if (argc == 6 && cmd == "ldsweep") // <freq> <over> <mode> <reso>
     {
@@ -461,14 +460,7 @@ main (int argc, char **argv)
       filter.set_test_linear (true);
       filter.process_block (left.size(), left.data(), right.data());
 
-      vector<float> out;
-      for (size_t i = 0; i < left.size(); i++)
-        {
-          out.push_back (left[i]);
-          out.push_back (right[i]);
-        }
-
-      test (out);
+      test (left, right);
     }
   if (argc == 4 && cmd == "roots") // <order> <res>
     {
@@ -643,19 +635,12 @@ main (int argc, char **argv)
             }
 
           filter.set_freq (atof (argv[4]));
-          filter.set_reso (0.95);
+          filter.set_reso (0.9);
           filter.set_frequency_range (atof (argv[5]), atof (argv[6]));
           filter.set_test_linear (true);
           filter.process_block (left.size(), left.data(), right.data());
 
-          vector<float> out;
-          for (size_t i = 0; i < left.size(); i++)
-            {
-              out.push_back (left[i]);
-              out.push_back (right[i]);
-            }
-
-          test (out);
+          test (left, right);
         };
       if (strcmp (argv[2], "sk") == 0)
         {
