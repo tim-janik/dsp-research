@@ -452,7 +452,7 @@ main (int argc, char **argv)
         }
 
       LadderVCF filter (atoi (argv[3]));
-      filter.set_mode (SpectMorph::LadderVCFMode (atoi (argv[4])));
+      filter.set_mode (SpectMorph::LadderVCF::Mode (atoi (argv[4])));
       filter.set_freq (atof (argv[2]));
       filter.set_reso (atof (argv[5]));
 

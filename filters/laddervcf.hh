@@ -11,10 +11,13 @@ namespace SpectMorph {
 
 using PandaResampler::Resampler2;
 
-enum class LadderVCFMode { LP1, LP2, LP3, LP4 };
-
 class LadderVCF
 {
+public:
+  enum Mode {
+    LP1, LP2, LP3, LP4
+  };
+private:
   struct Channel {
     float x1, x2, x3, x4;
     float y1, y2, y3, y4;
@@ -22,8 +25,8 @@ class LadderVCF
     std::unique_ptr<Resampler2> res_up;
     std::unique_ptr<Resampler2> res_down;
   };
-  std::array<Channel, 2> channels;
-  LadderVCFMode mode;
+  std::array<Channel, 2> channels_;
+  Mode mode_;
   float rate_ = 0;
   float freq_scale_factor_ = 0;
   float frequency_range_min_ = 0;
@@ -50,20 +53,20 @@ public:
   LadderVCF (int over) :
     over_ (over)
   {
-    for (auto& channel : channels)
+    for (auto& channel : channels_)
       {
         channel.res_up   = std::make_unique<Resampler2> (Resampler2::UP, over_, Resampler2::PREC_72DB);
         channel.res_down = std::make_unique<Resampler2> (Resampler2::DOWN, over_, Resampler2::PREC_72DB);
       }
-    set_mode (LadderVCFMode::LP4);
+    set_mode (Mode::LP4);
     set_rate (48000);
     set_frequency_range (10, 24000);
     reset();
   }
   void
-  set_mode (LadderVCFMode new_mode)
+  set_mode (Mode new_mode)
   {
-    mode = new_mode;
+    mode_ = new_mode;
   }
   void
   set_freq (float freq)
@@ -107,7 +110,7 @@ public:
   void
   reset()
   {
-    for (auto& c : channels)
+    for (auto& c : channels_)
       {
         c.x1 = c.x2 = c.x3 = c.x4 = 0;
         c.y1 = c.y2 = c.y3 = c.y4 = 0;
@@ -120,7 +123,7 @@ public:
   double
   delay()
   {
-    return channels[0].res_up->delay() / over_ + channels[0].res_down->delay();
+    return channels_[0].res_up->delay() / over_ + channels_[0].res_down->delay();
   }
 private:
   void
@@ -173,7 +176,7 @@ private:
    * Oscillator and Filter Algorithms for Virtual Analog Synthesis.
    * Computer Music Journal. 30. 19-31. 10.1162/comj.2006.30.2.19.
    */
-  template<LadderVCFMode MODE, bool STEREO> inline void
+  template<Mode MODE, bool STEREO> inline void
   run (float *left, float *right, float freq)
   {
     const float fc = std::clamp (freq, clamp_freq_min_, clamp_freq_max_) * freq_scale_factor_;
@@ -191,7 +194,7 @@ private:
           {
             float &value = i == 0 ? left[os] : right[os];
 
-            Channel& c = channels[i];
+            Channel& c = channels_[i];
             const float x = value * fparams_.pre_scale;
             const float g_comp = 0.5f; // passband gain correction
             const float x0 = distort (x - (c.y4 - g_comp * x) * res * 4);
@@ -210,16 +213,16 @@ private:
 
             switch (MODE)
               {
-                case LadderVCFMode::LP1:
+                case LP1:
                   value = c.y1 * fparams_.post_scale;
                   break;
-                case LadderVCFMode::LP2:
+                case LP2:
                   value = c.y2 * fparams_.post_scale;
                   break;
-                case LadderVCFMode::LP3:
+                case LP3:
                   value = c.y3 * fparams_.post_scale;
                   break;
-                case LadderVCFMode::LP4:
+                case LP4:
                   value = c.y4 * fparams_.post_scale;
                   break;
                 default:
@@ -228,7 +231,7 @@ private:
           }
       }
   }
-  template<LadderVCFMode MODE, bool STEREO> inline void
+  template<Mode MODE, bool STEREO> inline void
   do_process_block (uint          n_samples,
                     float        *left,
                     float        *right,
@@ -239,9 +242,9 @@ private:
     float over_samples_left[over_ * n_samples];
     float over_samples_right[over_ * n_samples];
 
-    channels[0].res_up->process_block (left, n_samples, over_samples_left);
+    channels_[0].res_up->process_block (left, n_samples, over_samples_left);
     if (STEREO)
-      channels[1].res_up->process_block (right, n_samples, over_samples_right);
+      channels_[1].res_up->process_block (right, n_samples, over_samples_right);
 
     if (!fparams_valid_)
       {
@@ -306,11 +309,11 @@ private:
             over_pos += over_;
           }
       }
-    channels[0].res_down->process_block (over_samples_left, over_ * n_samples, left);
+    channels_[0].res_down->process_block (over_samples_left, over_ * n_samples, left);
     if (STEREO)
-      channels[1].res_down->process_block (over_samples_right, over_ * n_samples, right);
+      channels_[1].res_down->process_block (over_samples_right, over_ * n_samples, right);
   }
-  template<LadderVCFMode MODE> inline void
+  template<Mode MODE> inline void
   process_block_mode (uint          n_samples,
                       float        *left,
                       float        *right,
@@ -336,16 +339,16 @@ public:
       {
         const uint todo = std::min (n_samples, MAX_BLOCK_SIZE);
 
-        switch (mode)
+        switch (mode_)
           {
-            case LadderVCFMode::LP4: process_block_mode<LadderVCFMode::LP4> (todo, left, right, freq_in, reso_in, drive_in);
-                                     break;
-            case LadderVCFMode::LP3: process_block_mode<LadderVCFMode::LP3> (todo, left, right, freq_in, reso_in, drive_in);
-                                     break;
-            case LadderVCFMode::LP2: process_block_mode<LadderVCFMode::LP2> (todo, left, right, freq_in, reso_in, drive_in);
-                                     break;
-            case LadderVCFMode::LP1: process_block_mode<LadderVCFMode::LP1> (todo, left, right, freq_in, reso_in, drive_in);
-                                     break;
+            case LP4: process_block_mode<LP4> (todo, left, right, freq_in, reso_in, drive_in);
+                      break;
+            case LP3: process_block_mode<LP3> (todo, left, right, freq_in, reso_in, drive_in);
+                      break;
+            case LP2: process_block_mode<LP2> (todo, left, right, freq_in, reso_in, drive_in);
+                      break;
+            case LP1: process_block_mode<LP1> (todo, left, right, freq_in, reso_in, drive_in);
+                      break;
           }
 
         if (left)
