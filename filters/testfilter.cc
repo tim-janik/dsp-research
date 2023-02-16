@@ -223,7 +223,7 @@ struct LadderVCFRef
     reso_ = reso;
   }
   void
-  run_block (size_t         n_samples,
+  process_block (size_t         n_samples,
              float         *left,
              float         *right,
              const float   *freq_in = nullptr,
@@ -247,7 +247,7 @@ lsweep (Ladder& vcf, double freq, double res)
   vcf.set_freq (freq);
   vcf.set_reso (res);
   for (size_t i = 0; i < samples.size(); i += 2)
-    vcf.run_block (1, &samples[i], &samples[i + 1]);
+    vcf.process_block (1, &samples[i], &samples[i + 1]);
   test (samples);
 }
 
@@ -274,7 +274,7 @@ ladder_perf (const char *label,
       while (i < lsamples.size())
         {
           size_t n_samples = min<size_t> (lsamples.size() - i, 1024);
-          vcf.run_block (n_samples, lsamples.data(), stereo ? rsamples.data() : nullptr, freq_in, reso_in, drive_in);
+          vcf.process_block (n_samples, lsamples.data(), stereo ? rsamples.data() : nullptr, freq_in, reso_in, drive_in);
           i += n_samples;
         }
     }
@@ -459,7 +459,7 @@ main (int argc, char **argv)
 
       /* test how the filter behaves as a linear filter (without distortion) */
       filter.set_test_linear (true);
-      filter.run_block (left.size(), left.data(), right.data());
+      filter.process_block (left.size(), left.data(), right.data());
 
       vector<float> out;
       for (size_t i = 0; i < left.size(); i++)
@@ -627,5 +627,45 @@ main (int argc, char **argv)
   if (argc == 2 && strcmp (argv[1], "lperfs") == 0)
     {
       ladder_perf_streams();
+    }
+  if (argc == 7 && strcmp (argv[1], "range") ==  0) // [sk|ld] <over> <freq> <min_freq> <max_freq>
+    {
+      auto test_range = [&] (auto& filter)
+        {
+          vector<float> left;
+          vector<float> right;
+          vector<float> samples = gen();
+
+          for (size_t i = 0; i < samples.size() / 2; i++)
+            {
+              left.push_back (samples[i * 2]);
+              right.push_back (samples[i * 2 + 1]);
+            }
+
+          filter.set_freq (atof (argv[4]));
+          filter.set_reso (0.95);
+          filter.set_frequency_range (atof (argv[5]), atof (argv[6]));
+          filter.set_test_linear (true);
+          filter.process_block (left.size(), left.data(), right.data());
+
+          vector<float> out;
+          for (size_t i = 0; i < left.size(); i++)
+            {
+              out.push_back (left[i]);
+              out.push_back (right[i]);
+            }
+
+          test (out);
+        };
+      if (strcmp (argv[2], "sk") == 0)
+        {
+          SKFilter filter (atoi (argv[3]));
+          test_range (filter);
+        }
+      else if (strcmp (argv[2], "ld") == 0)
+        {
+          LadderVCF filter (atoi (argv[3]));
+          test_range (filter);
+        }
     }
 }
