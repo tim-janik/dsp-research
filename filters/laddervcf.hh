@@ -97,11 +97,6 @@ public:
       }
   }
 private:
-  template<int CHANNEL_MASK> inline bool
-  need_channel (uint ch)
-  {
-    return (1 << ch) & CHANNEL_MASK;
-  }
   /*
    * This ladder filter implementation is mainly based on
    *
@@ -115,6 +110,9 @@ private:
     const float pi = M_PI;
     fc = pi * fc;
     const float g = 0.9892f * fc - 0.4342f * fc * fc + 0.1381f * fc * fc * fc - 0.0202f * fc * fc * fc * fc;
+    const float b0 = g * (1 / 1.3f);
+    const float b1 = g * (0.3f / 1.3f);
+    const float a1 = g - 1;
 
     res *= 1.0029f + 0.0526f * fc - 0.0926f * fc * fc + 0.0218f * fc * fc * fc;
 
@@ -130,16 +128,16 @@ private:
             const float g_comp = 0.5f; // passband gain correction
             const float x0 = distort (x - (c.y4 - g_comp * x) * res * 4);
 
-            c.y1 = (x0 * (1 / 1.3f) + c.x1 * (0.3f / 1.3f) - c.y1) * g + c.y1;
+            c.y1 = b0 * x0 + b1 * c.x1 - a1 * c.y1;
             c.x1 = x0;
 
-            c.y2 = (c.y1 * (1 / 1.3f) + c.x2 * (0.3f / 1.3f) - c.y2) * g + c.y2;
+            c.y2 = b0 * c.y1 + b1 * c.x2 - a1 * c.y2;
             c.x2 = c.y1;
 
-            c.y3 = (c.y2 * (1 / 1.3f) + c.x3 * (0.3f / 1.3f) - c.y3) * g + c.y3;
+            c.y3 = b0 * c.y2 + b1 * c.x3 - a1 * c.y3;
             c.x3 = c.y2;
 
-            c.y4 = (c.y3 * (1 / 1.3f) + c.x4 * (0.3f / 1.3f) - c.y4) * g + c.y4;
+            c.y4 = b0 * c.y3 + b1 * c.x4 - a1 * c.y4;
             c.x4 = c.y3;
 
             switch (MODE)
