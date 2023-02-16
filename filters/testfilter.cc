@@ -267,7 +267,7 @@ ladder_perf (const char *label,
   const double start_t = get_time();
   for (int runs = 0; runs < n_runs; runs++)
     {
-      Ladder vcf;
+      Ladder vcf (4);
       vcf.set_freq (500);
       vcf.set_reso (0.75);
       size_t i = 0;
@@ -291,14 +291,14 @@ ladder_perf_streams()
   vector<float> reso_in (1024, 0.9);
   vector<float> drive_in (1024, 10);
 
-  ladder_perf<LadderVCFNonLinear> ("nl-none");
-  ladder_perf<LadderVCFNonLinear> ("nl-f",          true,  &freq_in[0], nullptr);
-  ladder_perf<LadderVCFNonLinear> ("nl-f+r",        true,  &freq_in[0], &reso_in[0]);
-  ladder_perf<LadderVCFNonLinear> ("nl-f+r+d",      true,  &freq_in[0], &reso_in[0], &drive_in[0]);
-  ladder_perf<LadderVCFNonLinear> ("nl-mono-none",  false);
-  ladder_perf<LadderVCFNonLinear> ("nl-mono-f",     false, &freq_in[0], nullptr);
-  ladder_perf<LadderVCFNonLinear> ("nl-mono-f+r",   false, &freq_in[0], &reso_in[0]);
-  ladder_perf<LadderVCFNonLinear> ("nl-mono-f+r+d", false, &freq_in[0], &reso_in[0], &drive_in[0]);
+  ladder_perf<LadderVCF> ("nl-none");
+  ladder_perf<LadderVCF> ("nl-f",          true,  &freq_in[0], nullptr);
+  ladder_perf<LadderVCF> ("nl-f+r",        true,  &freq_in[0], &reso_in[0]);
+  ladder_perf<LadderVCF> ("nl-f+r+d",      true,  &freq_in[0], &reso_in[0], &drive_in[0]);
+  ladder_perf<LadderVCF> ("nl-mono-none",  false);
+  ladder_perf<LadderVCF> ("nl-mono-f",     false, &freq_in[0], nullptr);
+  ladder_perf<LadderVCF> ("nl-mono-f+r",   false, &freq_in[0], &reso_in[0]);
+  ladder_perf<LadderVCF> ("nl-mono-f+r+d", false, &freq_in[0], &reso_in[0], &drive_in[0]);
 }
 
 
@@ -440,7 +440,7 @@ main (int argc, char **argv)
 
       test (out);
     }
-  if (argc == 5 && cmd == "ldsweep") // <freq> <mode> <reso>
+  if (argc == 6 && cmd == "ldsweep") // <freq> <over> <mode> <reso>
     {
       vector<float> left;
       vector<float> right;
@@ -452,14 +452,13 @@ main (int argc, char **argv)
           right.push_back (samples[i * 2 + 1]);
         }
 
-      SpectMorph::LadderVCFNonLinear filter;
-      filter.set_mode (SpectMorph::LadderVCFMode (atoi (argv[3])));
+      LadderVCF filter (atoi (argv[3]));
+      filter.set_mode (SpectMorph::LadderVCFMode (atoi (argv[4])));
       filter.set_freq (atof (argv[2]));
-      filter.set_reso (atof (argv[4]));
+      filter.set_reso (atof (argv[5]));
 
       /* test how the filter behaves as a linear filter (without distortion) */
-      float pre_scale = 0.001;
-      filter.set_scale (pre_scale, 1 / pre_scale);
+      filter.set_test_linear (true);
       filter.run_block (left.size(), left.data(), right.data());
 
       vector<float> out;
@@ -615,23 +614,15 @@ main (int argc, char **argv)
       LadderVCFRef vcf;
       lsweep (vcf, atof (argv[2]), atof (argv[3]));
     }
-  if (argc == 4 && strcmp (argv[1], "ls") == 0) // <freq> <res>
+  if (argc == 5 && strcmp (argv[1], "ls-nl") == 0) // <freq> <res> <over>
     {
-      LadderVCFLinear vcf;
-      lsweep (vcf, atof (argv[2]), atof (argv[3]));
-    }
-  if (argc == 4 && strcmp (argv[1], "ls-nl") == 0) // <freq> <res>
-    {
-      LadderVCFNonLinear vcf;
-      vcf.set_scale (0.01, 100);
+      LadderVCF vcf (atoi (argv[4]));
+      vcf.set_test_linear (true);
       lsweep (vcf, atof (argv[2]), atof (argv[3]));
     }
   if (argc == 2 && strcmp (argv[1], "lperf") == 0)
     {
-      ladder_perf<LadderVCFRef>("LadderVCFRef");
-      ladder_perf<LadderVCFLinear>("LadderVCFLinear");
-      ladder_perf<LadderVCFNonLinear>("MoogVCFNonLinear");
-      ladder_perf<LadderVCFNonLinearCheap>("MoogVCFNonLinearCheap");
+      ladder_perf<LadderVCF>("MoogVCFNonLinear");
     }
   if (argc == 2 && strcmp (argv[1], "lperfs") == 0)
     {
