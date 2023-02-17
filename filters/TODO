@@ -1,4 +1,6 @@
 - compare to laddervcf.hh
 - double check reso / drive normalization
 - latency compensation (SpectMorph)
+- possibly add MetaFilter and/or NoFilter
+- run filter envelope for Anklang even if filter is bypassed
 - asymmetric saturation
