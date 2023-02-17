@@ -1,7 +1,6 @@
 // This Source Code Form is licensed MPL-2.0: http://mozilla.org/MPL/2.0
 
-#ifndef SPECTMORPH_LADDER_VCF_HH
-#define SPECTMORPH_LADDER_VCF_HH
+#pragma once
 
 #include "pandaresampler.hh"
 
@@ -146,12 +145,14 @@ private:
   void
   setup_reso_drive (FParams& fparams, float reso, float drive)
   {
+    reso = std::clamp (reso, 0.001f, 1.f);
+
     if (test_linear_) // test filter as linear filter; don't do any resonance correction
       {
         const float scale = 1e-5;
         fparams.pre_scale = scale;
         fparams.post_scale = 1 / scale;
-        fparams.reso = reso;
+        fparams.reso = reso * 4;
 
         return;
       }
@@ -164,10 +165,14 @@ private:
         negative_drive_vol = exp2f (drive * db_x2_factor);
         drive = 0;
       }
-    float vol = exp2f ((drive + -12 * reso) * db_x2_factor);
+    // drive resonance boost
+    if (drive > 0)
+      reso += drive * sqrt (reso) * reso * 0.03f;
+
+    float vol = exp2f ((drive + -12 * sqrt (reso)) * db_x2_factor);
     fparams.pre_scale = negative_drive_vol * vol;
     fparams.post_scale = std::max (1 / vol, 1.0f);
-    fparams.reso = reso;
+    fparams.reso = sqrt (reso) * 4;
   }
   /*
    * This ladder filter implementation is mainly based on
@@ -197,7 +202,7 @@ private:
             Channel& c = channels_[i];
             const float x = value * fparams_.pre_scale;
             const float g_comp = 0.5f; // passband gain correction
-            const float x0 = distort (x - (c.y4 - g_comp * x) * res * 4);
+            const float x0 = distort (x - (c.y4 - g_comp * x) * res);
 
             c.y1 = b0 * x0 + b1 * c.x1 - a1 * c.y1;
             c.x1 = x0;
@@ -332,7 +337,7 @@ public:
   void
   process_block (uint         n_samples,
                  float       *left,
-                 float       *right,
+                 float       *right = nullptr,
                  const float *freq_in = nullptr,
                  const float *reso_in = nullptr,
                  const float *drive_in = nullptr)
@@ -370,5 +375,3 @@ public:
 };
 
 } // SpectMorph
-
-#endif // __BSE_DEVICES_LADDER_VCF_HH__

@@ -12,8 +12,9 @@
 using std::string;
 using std::vector;
 using std::min;
+using std::max;
 
-using namespace SpectMorph; // LadderVCF
+using SpectMorph::LadderVCF;
 
 static inline float
 db_from_complex (float re, float im, float min_dB)
@@ -120,20 +121,20 @@ test (const vector<float>& left, const vector<float>& right)
   test (out);
 }
 
+template<class Filter>
 vector<float>
-filter_partials_test (SKFilter& filter)
+filter_partials_test (Filter& filter)
 {
   const int blocks = 2;
   const int block_size = 8192;
   const int len = block_size * blocks;
-  vector<float> in (len), freq (len);
+  vector<float> in (len);
 
   for (int i = 0; i < len; i++)
-    {
-      in[i] = ((i % 240) - 120) / 120.0; // 200 Hz Saw
-      freq[i] = 5000;
-    }
-  filter.process_block (len, in.data(), nullptr, freq.data());
+    in[i] = ((i % 240) - 120) / 120.0; // 200 Hz Saw
+                                       //
+  filter.set_freq (5000);
+  filter.process_block (len, in.data());
 
   static constexpr int ZERO_PAD = 8;
   vector<float> fft_in (block_size * ZERO_PAD), fft_out (block_size * ZERO_PAD);
@@ -182,6 +183,19 @@ skmode (const std::string& arg)
     {
       if (arg == modes[i])
         return SKFilter::Mode (i);
+    }
+  printf ("unsupported filter mode: %s\n", arg.c_str());
+  exit (1);
+}
+
+LadderVCF::Mode
+ldmode (const std::string& arg)
+{
+  vector<string> modes = { "lp1", "lp2", "lp3", "lp4" };
+  for (size_t i = 0; i < modes.size(); i++)
+    {
+      if (arg == modes[i])
+        return LadderVCF::Mode (i);
     }
   printf ("unsupported filter mode: %s\n", arg.c_str());
   exit (1);
@@ -452,7 +466,7 @@ main (int argc, char **argv)
         }
 
       LadderVCF filter (atoi (argv[3]));
-      filter.set_mode (SpectMorph::LadderVCF::Mode (atoi (argv[4])));
+      filter.set_mode (ldmode (argv[4]));
       filter.set_freq (atof (argv[2]));
       filter.set_reso (atof (argv[5]));
 
@@ -587,9 +601,24 @@ main (int argc, char **argv)
             printf ("%zd %f\n", p * 200, db (partials[p]));
         }
     }
+  if (argc == 5 && cmd == "lnfilt") // <mode> <res> <vol>
+    {
+      LadderVCF filter (/* oversample */ 4);
+
+      filter.set_mode (ldmode (argv[2]));
+      filter.set_reso (atof (argv[3]));
+      filter.set_drive (atof (argv[4]));
+
+      auto partials = filter_partials_test (filter);
+      for (size_t p = 0; p < partials.size(); p++)
+        {
+          if (partials[p])
+            printf ("%zd %f\n", p * 200, db (partials[p]));
+        }
+    }
   if (argc == 4 && cmd == "nfscan") // <mode> <drive>
     {
-      for (int reso = 0; reso < 125; reso++)
+      for (int reso = 0; reso < 100; reso++)
         {
           SKFilter filter (/* oversample */ 4);
 
@@ -599,6 +628,24 @@ main (int argc, char **argv)
 
           auto partials = filter_partials_test (filter);
           printf ("%d %f\n", reso, db (partials[5000 / 200]));
+        }
+    }
+  if (argc == 4 && cmd == "lnfscan") // <mode> <drive>
+    {
+      for (int reso = 0; reso < 100; reso++)
+        {
+          LadderVCF filter (/* oversample */ 4);
+
+          filter.set_mode (ldmode (argv[2]));
+          filter.set_drive (atof (argv[3]));
+          filter.set_reso (reso * 0.01);
+
+          auto partials = filter_partials_test (filter);
+          float mx = 0;
+          for (int i = 4000 / 200; i <= 6000 / 200; i++)
+            mx = max (mx, partials[i]);
+
+          printf ("%d %f\n", reso, db (mx));
         }
     }
   if (argc == 4 && strcmp (argv[1], "ls-ref") == 0) // <freq> <res>
