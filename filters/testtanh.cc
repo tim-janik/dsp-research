@@ -63,6 +63,8 @@ distort (float x)
 float
 cheap_tanh (float x)
 {
+  x = std::clamp (x, -3.0f, 3.0f);
+
   return (x * (27.0f + x * x) / (27.0f + 9.0f * x * x));
 }
 
@@ -86,7 +88,9 @@ enum TFunc
 {
   TF_TANH,
   TF_CHEAP_TANH,
-  TF_DISTORT
+  TF_DISTORT,
+  TF_CLIP,
+  TF_COPY
 };
 
 template<TFunc F>
@@ -98,6 +102,8 @@ void test(int argc, char **argv)
         case TF_TANH:       return std::tanh (f);
         case TF_CHEAP_TANH: return cheap_tanh (f);
         case TF_DISTORT:    return distort (f);
+        case TF_CLIP:       return std::clamp (f, -1.0f, 1.0f);
+        case TF_COPY:       return f;
       }
   };
   string cmd = argv[2];
@@ -171,6 +177,10 @@ main (int argc, char **argv)
     test<TF_CHEAP_TANH> (argc, argv);
   if (cmd == "distort")
     test<TF_DISTORT> (argc, argv);
+  if (cmd == "clip")
+    test<TF_CLIP> (argc, argv);
+  if (cmd == "copy")
+    test<TF_COPY> (argc, argv);
 #if 0
   for (int i = 0; i < 48000; i++)
     {
