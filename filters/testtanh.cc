@@ -82,9 +82,24 @@ get_time()
   return tv.tv_sec + tv.tv_usec / 1000000.0;
 }
 
-template<typename F>
-void test(F f, int argc, char **argv)
+enum TFunc
 {
+  TF_TANH,
+  TF_CHEAP_TANH,
+  TF_DISTORT
+};
+
+template<TFunc F>
+void test(int argc, char **argv)
+{
+  auto tanh_f = [] (float f) {
+    switch (F)
+      {
+        case TF_TANH:       return std::tanh (f);
+        case TF_CHEAP_TANH: return cheap_tanh (f);
+        case TF_DISTORT:    return distort (f);
+      }
+  };
   string cmd = argv[2];
   if (cmd == "spect") // <factor>
     {
@@ -95,7 +110,7 @@ void test(F f, int argc, char **argv)
       vector<float> block;
       for (int i = 0; i < 4096; i++)
         {
-          block.push_back (f (sin (i * 2 * M_PI / 48000 * freq) * amp));
+          block.push_back (tanh_f (sin (i * 2 * M_PI / 48000 * freq) * amp));
         }
       apply_normalized_window (window_blackman_harris_92, block);
       vector<float> out (BS + 2);
@@ -121,7 +136,7 @@ void test(F f, int argc, char **argv)
         int REPS = 200'000;
         for (int j = 0; j < REPS; j++)
           for (size_t i = 0; i < block.size(); i++)
-            out[i] = f (block[i]);
+            out[i] = tanh_f (block[i]);
         printf ("flat: %f ns/sample\n", (get_time() - t) / (REPS * block.size()) * 1e9);
       }
       {
@@ -131,7 +146,7 @@ void test(F f, int argc, char **argv)
         for (int j = 0; j < REPS; j++)
           for (size_t i = 0; i < block.size(); i++)
             {
-              last = f (block[i] + last);
+              last = tanh_f (block[i] + last);
               out[i] = last;
             }
         printf ("rec:  %f ns/sample\n", (get_time() - t) / (REPS * block.size()) * 1e9);
@@ -151,11 +166,11 @@ main (int argc, char **argv)
   string cmd = argv[1];
 
   if (cmd == "tanh")
-    test (tanh, argc, argv);
+    test<TF_TANH> (argc, argv);
   if (cmd == "cheap_tanh")
-    test (cheap_tanh, argc, argv);
+    test<TF_CHEAP_TANH> (argc, argv);
   if (cmd == "distort")
-    test (distort, argc, argv);
+    test<TF_DISTORT> (argc, argv);
 #if 0
   for (int i = 0; i < 48000; i++)
     {
