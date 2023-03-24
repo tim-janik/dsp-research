@@ -136,14 +136,6 @@ private:
     clamp_freq_min_ = frequency_range_min_;
     clamp_freq_max_ = std::min (frequency_range_max_, rate_ * over_ * 0.49f);
   }
-  float
-  distort (float x)
-  {
-    /* shaped somewhat similar to tanh() and others, but faster */
-    x = std::clamp (x, -1.0f, 1.0f);
-
-    return x - x * x * x * (1.0f / 3);
-  }
   void
   setup_reso_drive (FParams& fparams, float reso, float drive)
   {
