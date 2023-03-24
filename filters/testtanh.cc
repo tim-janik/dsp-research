@@ -111,7 +111,7 @@ void test(int argc, char **argv)
     {
       float amp = atof (argv[3]);
 
-      const double freq = 1000;
+      const double freq = 876;
       int BS = 4096;
       vector<float> block;
       for (int i = 0; i < 4096; i++)
@@ -158,33 +158,41 @@ void test(int argc, char **argv)
         printf ("rec:  %f ns/sample\n", (get_time() - t) / (REPS * block.size()) * 1e9);
       }
     }
-}
-
-int
-main (int argc, char **argv)
-{
-  if (argc < 2)
+  if (cmd == "plot")
     {
-      printf ("too few args\n");
-      return 1;
+      for (double x = -5; x <= 5; x += 0.01)
+        printf ("%f %f %f\n", x, tanh (x), tanh_f (x));
     }
-
-  string cmd = argv[1];
-
-  if (cmd == "tanh")
-    test<TF_TANH> (argc, argv);
-  if (cmd == "cheap_tanh")
-    test<TF_CHEAP_TANH> (argc, argv);
-  if (cmd == "distort")
-    test<TF_DISTORT> (argc, argv);
-  if (cmd == "clip")
-    test<TF_CLIP> (argc, argv);
-  if (cmd == "copy")
-    test<TF_COPY> (argc, argv);
-#if 0
-  for (int i = 0; i < 48000; i++)
+  if (cmd == "tplot")
     {
-      //printf ("%f\n", tanh (sin (i * 2 * M_PI / 48000 * freq) * 2));
+      float amp = atof (argv[3]);
+      const double freq = 876;
+      for (int i = 0; i < 48000; i++)
+        {
+          printf ("%f %f\n", tanh (sin (i * 2 * M_PI / 48000 * freq) * amp), tanh_f (sin (i * 2 * M_PI / 48000 * freq) * amp));
+        }
     }
-#endif
-}
+  }
+
+  int
+  main (int argc, char **argv)
+  {
+    if (argc < 2)
+      {
+        printf ("too few args\n");
+        return 1;
+      }
+
+    string cmd = argv[1];
+
+    if (cmd == "tanh")
+      test<TF_TANH> (argc, argv);
+    if (cmd == "cheap_tanh")
+      test<TF_CHEAP_TANH> (argc, argv);
+    if (cmd == "distort")
+      test<TF_DISTORT> (argc, argv);
+    if (cmd == "clip")
+      test<TF_CLIP> (argc, argv);
+    if (cmd == "copy")
+      test<TF_COPY> (argc, argv);
+  }
