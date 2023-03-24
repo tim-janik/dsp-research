@@ -8,6 +8,12 @@
 
 #include <fftw3.h>
 
+#define PANDA_RESAMPLER_HEADER_ONLY
+#include "pandaresampler.hh"
+
+using PandaResampler::Resampler2;
+
+
 using std::vector;
 using std::string;
 
@@ -93,6 +99,24 @@ enum TFunc
   TF_COPY
 };
 
+void
+upsample (vector<float>& block, int factor)
+{
+  Resampler2 res (Resampler2::UP, factor, Resampler2::PREC_72DB);
+  vector<float> up_block (block.size() * factor);
+  res.process_block (block.data(), block.size(), up_block.data());
+  block = up_block;
+}
+
+void
+downsample (vector<float>& block, int factor)
+{
+  Resampler2 res (Resampler2::DOWN, factor, Resampler2::PREC_72DB);
+  vector<float> down_block (block.size() / factor);
+  res.process_block (block.data(), block.size(), down_block.data());
+  block = down_block;
+}
+
 template<TFunc F>
 void test(int argc, char **argv)
 {
@@ -116,8 +140,12 @@ void test(int argc, char **argv)
       vector<float> block;
       for (int i = 0; i < 4096; i++)
         {
-          block.push_back (tanh_f (sin (i * 2 * M_PI / 48000 * freq) * amp));
+          block.push_back (sin (i * 2 * M_PI / 48000 * freq));
         }
+      upsample (block, 8);
+      for (size_t i = 0; i < block.size(); i++)
+        block[i] = tanh_f (block[i] * amp);
+      downsample (block, 8);
       apply_normalized_window (window_blackman_harris_92, block);
       vector<float> out (BS + 2);
       fft (block.size(), block.data(), out.data());
