@@ -128,8 +128,8 @@ main (int argc, char **argv)
       env.set_decay (0.3);
       set_shape (argv[2]);
       const int BS = 64;
-      const int BLOCKS = 50;
-      const int REPS = 10'000;
+      const int BLOCKS = 500;
+      const int REPS = 5'000;
       double start_time = get_time();
       for (int r = 0; r < REPS; r++)
         {
@@ -166,8 +166,8 @@ main (int argc, char **argv)
           exit (1);
         }
       const int BS = 64;
-      const int BLOCKS = 50;
-      const int REPS = 10'000;
+      const int BLOCKS = 500;
+      const int REPS = 5'000;
       double start_time = get_time();
       for (int r = 0; r < REPS; r++)
         {
