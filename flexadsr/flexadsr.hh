@@ -203,7 +203,7 @@ private:
             params_changed_ = true;
             break;
           }
-        if (STATE == State::SUSTAIN && level_ < sustain_level_)
+        if (STATE == State::DECAY && level_ < sustain_level_)
           {
             state_          = State::SUSTAIN;
             level_          = sustain_level_;
@@ -246,7 +246,7 @@ public:
     if (state_ == State::DECAY)
       {
         compute_slope_params (decay_, 1, sustain_level_);
-        process<State::SUSTAIN> (&i, samples, n_samples);
+        process<State::DECAY> (&i, samples, n_samples);
       }
     if (state_ == State::RELEASE)
       {
