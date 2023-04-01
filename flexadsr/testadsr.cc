@@ -4,9 +4,24 @@
 #include <string>
 #include <vector>
 
+#include <sys/time.h>
+
 using std::string;
 
 #include "flexadsr.hh"
+#include "envelope.hh"
+
+inline double
+get_time()
+{
+  /* return timestamp in seconds as double */
+  timeval tv;
+  gettimeofday (&tv, 0);
+
+  return tv.tv_sec + tv.tv_usec / 1000000.0;
+}
+
+float no_optimize = 0;
 
 int
 main (int argc, char **argv)
@@ -19,6 +34,11 @@ main (int argc, char **argv)
       env.set_shape (ADSR::Shape::EXPONENTIAL);
     else if (s == "FLEX")
       env.set_shape (ADSR::Shape::FLEXIBLE);
+    else
+      {
+        fprintf (stderr, "bad shape\n");
+        exit (1);
+      }
   };
 
   int t = 0;
@@ -101,5 +121,69 @@ main (int argc, char **argv)
       process (48000);
       env.set_release (3);
       process (96000);
+    }
+  if (string (argv[1]) == "perf") // <shape>
+    {
+      env.set_attack (0.3);
+      env.set_decay (0.3);
+      set_shape (argv[2]);
+      const int BS = 64;
+      const int BLOCKS = 50;
+      const int REPS = 10'000;
+      double start_time = get_time();
+      for (int r = 0; r < REPS; r++)
+        {
+          env.start();
+          for (int i = 0; i < BLOCKS; i++)
+            {
+              float freq_in[BS];
+              env.process (freq_in, BS);
+              for (int i = 0; i < BS; i++)
+                {
+                  freq_in[i] = exp2f (freq_in[i]);
+                  no_optimize += freq_in[i];
+                }
+            }
+        }
+      double t = get_time() - start_time;
+      printf ("%f ns/sample\n", t * 1e9 / (REPS * BLOCKS * BS));
+      printf ("%f streams @ 48kHz\n", 1.0 / (t * 48000 / (REPS * BLOCKS * BS)));
+    }
+  if (string (argv[1]) == "lperf") // <shape>
+    {
+      Envelope envelope;
+
+      envelope.set_attack (0.3);
+      envelope.set_decay (0.3);
+      string s = argv[2];
+      if (s == "LIN")
+        envelope.set_shape (Envelope::Shape::LINEAR);
+      else if (s == "EXP")
+        envelope.set_shape (Envelope::Shape::EXPONENTIAL);
+      else
+        {
+          fprintf (stderr, "bad shape\n");
+          exit (1);
+        }
+      const int BS = 64;
+      const int BLOCKS = 50;
+      const int REPS = 10'000;
+      double start_time = get_time();
+      for (int r = 0; r < REPS; r++)
+        {
+          envelope.start (48000);
+          for (int i = 0; i < BLOCKS; i++)
+            {
+              float freq_in[BS];
+              for (int i = 0; i < BS; i++)
+                {
+                  freq_in[i] = exp2f (envelope.get_next());
+                  no_optimize += freq_in[i];
+                }
+            }
+        }
+      double t = get_time() - start_time;
+      printf ("%f ns/sample\n", t * 1e9 / (REPS * BLOCKS * BS));
+      printf ("%f streams @ 48kHz\n", 1.0 / (t * 48000 / (REPS * BLOCKS * BS)));
     }
 }
