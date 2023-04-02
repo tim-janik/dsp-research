@@ -210,7 +210,7 @@ private:
             params_changed_ = true;
             break;
           }
-        if (STATE == State::RELEASE && level_ < 0)
+        if (STATE == State::RELEASE && level_ < 1e-5)
           {
             state_ = State::DONE;
             level_ = 0;
