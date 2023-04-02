@@ -26,14 +26,14 @@ float no_optimize = 0;
 int
 main (int argc, char **argv)
 {
-  ADSR env;
+  FlexADSR env;
   auto set_shape = [&env] (string s) {
     if (s == "LIN")
-      env.set_shape (ADSR::Shape::LINEAR);
+      env.set_shape (FlexADSR::Shape::LINEAR);
     else if (s == "EXP")
-      env.set_shape (ADSR::Shape::EXPONENTIAL);
+      env.set_shape (FlexADSR::Shape::EXPONENTIAL);
     else if (s == "FLEX")
-      env.set_shape (ADSR::Shape::FLEXIBLE);
+      env.set_shape (FlexADSR::Shape::FLEXIBLE);
     else
       {
         fprintf (stderr, "bad shape\n");
@@ -60,12 +60,7 @@ main (int argc, char **argv)
       env.set_release_slope (atof (argv[8]));
       string s = argv[10];
 
-      if (s == "LIN")
-        env.set_shape (ADSR::Shape::LINEAR);
-      else if (s == "EXP")
-        env.set_shape (ADSR::Shape::EXPONENTIAL);
-      else if (s == "FLEX")
-        env.set_shape (ADSR::Shape::FLEXIBLE);
+      set_shape (s);
 
       env.set_rate (48000);
       env.start();

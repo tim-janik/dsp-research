@@ -2,7 +2,7 @@
 
 #pragma once
 
-class ADSR
+class FlexADSR
 {
 public:
   enum class Shape { FLEXIBLE, EXPONENTIAL, LINEAR };
