@@ -286,6 +286,15 @@ public:
       }
   }
   bool
+  is_constant() const
+  {
+    if (state_ == State::SUSTAIN)
+      {
+        return !params_changed_ && sustain_steps_ == 0;
+      }
+    return state_ == State::DONE;
+  }
+  bool
   done() const
   {
     return state_ == State::DONE;
