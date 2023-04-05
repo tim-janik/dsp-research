@@ -2,6 +2,7 @@
 
 #include "skfilter.hh"
 #include "laddervcf.hh"
+#include "dcblocker.hh"
 
 #include <fftw3.h>
 #include <sys/time.h>
@@ -698,6 +699,31 @@ main (int argc, char **argv)
         {
           LadderVCF filter (atoi (argv[3]));
           test_range (filter);
+        }
+    }
+  if (argc == 2 && cmd == "dcfreqs")
+    {
+      for (double freq = 0.01; freq < 24000; freq *= 1.5)
+        {
+          printf ("%f", freq);
+          for (int order = 1; order <= 2; order++)
+            {
+              vector<float> in_sin (48000);
+              vector<float> in_cos (48000);
+              for (size_t i = 0; i < in_sin.size(); i++)
+                {
+                  in_sin[i] = sin (freq * i * 2 * M_PI / 48000);
+                  in_cos[i] = cos (freq * i * 2 * M_PI / 48000);
+                }
+
+              DCBlocker dc_blocker;
+              dc_blocker.reset (20, 48000, order);
+              dc_blocker.process (in_sin.size(), in_sin.data(), in_cos.data());
+
+              std::complex<float> f (in_sin.back(), in_cos.back());
+              printf (" %.17g", db (std::abs (f)));
+            }
+          printf ("\n");
         }
     }
 }
