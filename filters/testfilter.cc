@@ -726,4 +726,53 @@ main (int argc, char **argv)
           printf ("\n");
         }
     }
+  if (argc == 2 && cmd == "laddermax")
+    {
+      LadderVCF vcf (4);
+      vcf.set_test_linear (true);
+      vcf.set_reso (0.95);
+      vcf.set_rate (48000);
+      vcf.set_mode (LadderVCF::LP4);
+      vcf.set_frequency_range (1, 24000);
+
+      for (float f = 10; f < 24000; f = f * 1.1)
+        {
+          vcf.set_freq (f);
+
+          auto vcf_response = [&] (double freq) {
+            if (freq < 5)
+              return 0.f;
+            if (freq > 23000)
+              return 0.f;
+            int sz = 100 * 48000 / f;
+            vector<float> left (sz);
+            vector<float> right (sz);
+            for (size_t i = 0; i < left.size(); i++)
+              {
+                left[i] = sin (2 * M_PI * i * freq / 48000);
+                right[i] = cos (2 * M_PI * i * freq / 48000);
+              }
+            vcf.reset();
+            vcf.process_block (left.size(), left.data(), right.data());
+            return std::abs (std::complex (left.back(), right.back()));
+          };
+
+          double freq = f;
+          double freq_delta = f / 2;
+
+          while (freq_delta > f * 1e-8)
+            {
+              float r_freq = vcf_response (freq);
+
+              if (vcf_response (freq + freq_delta) > r_freq)
+                freq += freq_delta;
+              else if (vcf_response (freq - freq_delta) > r_freq)
+                freq -= freq_delta;
+              else
+                freq_delta /= 3;
+            }
+
+          printf ("%.17g %.17g %.17g\n", f, freq, vcf_response (freq));
+        }
+    }
 }
