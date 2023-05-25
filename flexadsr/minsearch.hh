@@ -17,13 +17,13 @@ template<class ScoreFunc>
 void
 minimize (std::vector<double>& vec, ScoreFunc score_func, const std::string& label = "")
 {
-  int i = 0;
   int maxi = 50;
 
   double old_score = score_func (vec);
   double learning_rate = 1;
   bool trace = !label.empty();
-  while (i < maxi)
+  bool improved;
+  do
     {
       std::vector<double> d;
 
@@ -35,35 +35,42 @@ minimize (std::vector<double>& vec, ScoreFunc score_func, const std::string& lab
           double h = 1e-9;
           std::vector<double> vec1 = vec;
           vec1[m] += h;
-          double deriv = (score_func (vec1) - old_score) / h;
-          d.push_back (-deriv * learning_rate);
+          d.push_back ((score_func (vec1) - old_score) / h);
 
           if (trace)
-            fprintf (stderr, "% 3.7f ", deriv);
+            fprintf (stderr, "% 3.7f ", d.back());
         }
 
       if (trace)
           fprintf (stderr, "]  %25.17g %s           \r", old_score, label.c_str());
 
-      std::vector<double> vec1 = vec;
-      for (size_t m = 0; m < vec.size(); m++)
-        vec1[m] += d[m];
-
-      double new_score = score_func (vec1);
-      if (new_score < old_score)
+      double new_score;
+      int i = 0;
+      improved = false;
+      do
         {
-          vec = vec1;
-          old_score = new_score;
+          std::vector<double> vec1 = vec;
+          for (size_t m = 0; m < vec.size(); m++)
+            vec1[m] -= d[m] * learning_rate;
 
-          learning_rate *= 1.5;
-          i = 0;
+          new_score = score_func (vec1);
+          if (new_score < old_score)
+            {
+              improved = true;
+
+              vec = vec1;
+              old_score = new_score;
+
+              learning_rate *= 1.5;
+            }
+          else
+            {
+              learning_rate /= 1.5;
+            }
         }
-      else
-        {
-          learning_rate /= 1.5;
-        }
-      i++;
+      while (!improved && i++ < maxi);
     }
+  while (improved);
   if (trace)
     fprintf (stderr, "\n");
 }
