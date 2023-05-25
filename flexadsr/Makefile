@@ -1,6 +1,6 @@
 CXXFLAGS=-O3 -Wall -g -std=c++17 -ffast-math
 
-all: abcfit polyfit perffloat testadsr
+all: abcfit polyfit perffloat testadsr testminsearch
 
 testadsr.o: testadsr.cc flexadsr.hh
 
