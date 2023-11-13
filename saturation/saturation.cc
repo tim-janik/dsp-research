@@ -38,7 +38,9 @@ main (int argc, char **argv)
 
       for (int mode = 0; mode <= 3; mode++)
         {
+          dist.reset (48000);
           dist.set_mode (static_cast<SaturationDSP::Mode> (mode));
+          dist.set_mix (50, false);
 
           const int block_size = 512;
           float left[block_size], right[block_size];
