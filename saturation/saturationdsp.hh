@@ -98,7 +98,7 @@ public:
   reset (unsigned int sample_rate)
   {
     mix_max_step = 1 / (0.050 * sample_rate * oversample);    // smooth mix range over 50ms
-    drive_max_step = 6 / (0.010 * sample_rate * oversample);  // smooth factor delta of 6dB over 10ms
+    drive_max_step = 6 / (0.020 * sample_rate * oversample);  // smooth factor delta of 6dB over 20ms
 
     res_up_left->reset();
     res_up_right->reset();
@@ -132,15 +132,8 @@ public:
   }
   template<bool STEREO>
   void
-  process (float *left_in, float *right_in, float *left_out, float *right_out, int n_samples)
+  process_sub_block (float *left_over, float *right_over, int n_samples)
   {
-    float left_over[oversample * n_samples];
-    float right_over[oversample * n_samples];
-
-    res_up_left->process_block (left_in, n_samples, left_over);
-    if (STEREO)
-      res_up_right->process_block (right_in, n_samples, right_over);
-
     float mix_step = std::clamp ((dest_mix - current_mix) / (n_samples * oversample), -mix_max_step, mix_max_step);
     float drive_step = std::clamp ((dest_drive - current_drive) / (n_samples * oversample), -drive_max_step, drive_max_step);
 
@@ -193,6 +186,26 @@ public:
             current_mix += mix_step;
             current_factor += factor_step;
           }
+      }
+  }
+  template<bool STEREO>
+  void
+  process (float *left_in, float *right_in, float *left_out, float *right_out, int n_samples)
+  {
+    float left_over[oversample * n_samples];
+    float right_over[oversample * n_samples];
+
+    res_up_left->process_block (left_in, n_samples, left_over);
+    if (STEREO)
+      res_up_right->process_block (right_in, n_samples, right_over);
+
+    int pos = 0;
+    while (pos < n_samples)
+      {
+        int todo = std::min (n_samples - pos, 64);
+
+        process_sub_block<STEREO> (left_over + pos * oversample, right_over + pos * oversample, todo);
+        pos += todo;
       }
 
     res_down_left->process_block (left_over, oversample * n_samples, left_out);
