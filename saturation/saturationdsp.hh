@@ -9,17 +9,17 @@
 
 namespace Ase {
 
-// https://www.musicdsp.org/en/latest/Other/238-rational-tanh-approximation.html
-float
-cheap_tanh (float x)
-{
-  x = std::clamp (x, -3.0f, 3.0f);
-
-  return (x * (27.0f + x * x) / (27.0f + 9.0f * x * x));
-}
-
 class SaturationDSP
 {
+  // https://www.musicdsp.org/en/latest/Other/238-rational-tanh-approximation.html
+  float
+  cheap_tanh (float x)
+  {
+    x = std::clamp (x, -3.0f, 3.0f);
+
+    return (x * (27.0f + x * x) / (27.0f + 9.0f * x * x));
+  }
+
   /*
    * tanh function which is restricted in the range [-4:4]
    */
@@ -130,7 +130,7 @@ public:
   {
     mode = new_mode;
   }
-  template<bool STEREO>
+  template<bool STEREO, bool INCREMENT>
   void
   process_sub_block (float *left_over, float *right_over, int n_samples)
   {
@@ -150,8 +150,11 @@ public:
             left_over[i] = lookup_table (left_over[i] * current_factor) * current_mix + left_over[i] * (1 - current_mix);
             if (STEREO)
               right_over[i] = lookup_table (right_over[i] * current_factor) * current_mix + right_over[i] * (1 - current_mix);
-            current_mix += mix_step;
-            current_factor += factor_step;
+            if (INCREMENT)
+              {
+                current_mix += mix_step;
+                current_factor += factor_step;
+              }
           }
       }
     if (mode == Mode::TANH_TRUE)
@@ -161,8 +164,11 @@ public:
             left_over[i] = std::tanh (left_over[i] * current_factor) * current_mix + left_over[i] * (1 - current_mix);
             if (STEREO)
               right_over[i] = std::tanh (right_over[i] * current_factor) * current_mix + right_over[i] * (1 - current_mix);
-            current_mix += mix_step;
-            current_factor += factor_step;
+            if (INCREMENT)
+              {
+                current_mix += mix_step;
+                current_factor += factor_step;
+              }
           }
       }
     if (mode == Mode::TANH_CHEAP)
@@ -172,8 +178,11 @@ public:
             left_over[i] = cheap_tanh (left_over[i] * current_factor) * current_mix + left_over[i] * (1 - current_mix);
             if (STEREO)
               right_over[i] = cheap_tanh (right_over[i] * current_factor) * current_mix + right_over[i] * (1 - current_mix);
-            current_mix += mix_step;
-            current_factor += factor_step;
+            if (INCREMENT)
+              {
+                current_mix += mix_step;
+                current_factor += factor_step;
+              }
           }
       }
     if (mode == Mode::HARD_CLIP)
@@ -183,8 +192,11 @@ public:
             left_over[i] = std::clamp (left_over[i] * current_factor, -1.f, 1.f) * current_mix + left_over[i] * (1 - current_mix);
             if (STEREO)
               right_over[i] = std::clamp (right_over[i] * current_factor, -1.f, 1.f) * current_mix + right_over[i] * (1 - current_mix);
-            current_mix += mix_step;
-            current_factor += factor_step;
+            if (INCREMENT)
+              {
+                current_mix += mix_step;
+                current_factor += factor_step;
+              }
           }
       }
   }
@@ -202,10 +214,19 @@ public:
     int pos = 0;
     while (pos < n_samples)
       {
-        int todo = std::min (n_samples - pos, 64);
-
-        process_sub_block<STEREO> (left_over + pos * oversample, right_over + pos * oversample, todo);
-        pos += todo;
+        if (std::abs (dest_drive - current_drive) > 0.001 || std::abs (dest_mix - current_mix) > 0.001)
+          {
+            // SLOW: drive or mix change within the block
+            int todo = std::min (n_samples - pos, 64);
+            process_sub_block<STEREO, true> (left_over + pos * oversample, right_over + pos * oversample, todo);
+            pos += todo;
+          }
+        else
+          {
+            // FAST: drive and mix remain constant during the block
+            process_sub_block<STEREO, false> (left_over + pos * oversample, right_over + pos * oversample, n_samples - pos);
+            pos = n_samples;
+          }
       }
 
     res_down_left->process_block (left_over, oversample * n_samples, left_out);

@@ -38,29 +38,42 @@ main (int argc, char **argv)
 
       for (int mode = 0; mode <= 3; mode++)
         {
-          dist.reset (48000);
-          dist.set_mode (static_cast<SaturationDSP::Mode> (mode));
-          dist.set_mix (50, false);
-
-          const int block_size = 512;
-          float left[block_size], right[block_size];
-
-          for (int i = 0; i < block_size; i++)
+          for (int const_params = 0; const_params < 2; const_params++)
             {
-              left[i] = right[i] = ((i % 100) - 50) / 50;
+              dist.reset (48000);
+              dist.set_mode (static_cast<SaturationDSP::Mode> (mode));
+              dist.set_mix (50, false);
+
+              const int block_size = 512;
+              float left[block_size], right[block_size];
+
+              for (int i = 0; i < block_size; i++)
+                {
+                  left[i] = right[i] = ((i % 100) - 50) / 50;
+                }
+              double start_t = get_time();
+              const int blocks = 50 * 1000;
+              for (int b = 0; b < blocks; b++)
+                {
+                  dist.process<true> (left, right, left, right, block_size);
+                  if (!const_params)
+                    {
+                      // ensure that smoothing needs to be used all the time
+                      if (b & 1)
+                        dist.set_drive (0, false);
+                      else
+                        dist.set_drive (36, false);
+                    }
+                }
+              double end_t = get_time();
+              double ns_per_sec = 1e9;
+              double ns_per_sample = ns_per_sec * (end_t - start_t) / (blocks * block_size);
+              printf ("with mode=%d, const=%d: ns/sample %f\n", mode, const_params, ns_per_sample);
+              printf ("                    bogopolyphony = %f\n\n", 1e9 / (ns_per_sample * 48000));
+              // no optimization
+              for (int i = 0; i < block_size; i++)
+                global += left[i] + right[i];
             }
-          double start_t = get_time();
-          const int blocks = 50 * 1000;
-          for (int b = 0; b < blocks; b++)
-            dist.process<true> (left, right, left, right, block_size);
-          double end_t = get_time();
-          double ns_per_sec = 1e9;
-          double ns_per_sample = ns_per_sec * (end_t - start_t) / (blocks * block_size);
-          printf ("with mode=%d: ns/sample %f\n", mode, ns_per_sample);
-          printf ("             bogopolyphony = %f\n\n", 1e9 / (ns_per_sample * 48000));
-          // no optimization
-          for (int i = 0; i < block_size; i++)
-            global += left[i] + right[i];
         }
     }
   if (argc == 2 && cmd == "sin")
