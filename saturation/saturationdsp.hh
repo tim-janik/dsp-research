@@ -141,14 +141,14 @@ public:
     if (STEREO)
       res_up_right->process_block (right_in, n_samples, right_over);
 
-    float mix_step = std::clamp ((dest_mix - current_mix) / n_samples / oversample, -mix_max_step, mix_max_step);
+    float mix_step = std::clamp ((dest_mix - current_mix) / (n_samples * oversample), -mix_max_step, mix_max_step);
     float drive_step = std::clamp ((dest_drive - current_drive) / (n_samples * oversample), -drive_max_step, drive_max_step);
 
     float current_factor = exp2f (current_drive / 6);
-    float end_factor = exp2f ((current_drive + drive_step * n_samples * oversample) / 6);
-    float factor_step = (end_factor - current_factor) / (n_samples * oversample);
-
     current_drive += drive_step * n_samples * oversample;
+
+    float end_factor = exp2f (current_drive / 6);
+    float factor_step = (end_factor - current_factor) / (n_samples * oversample);
 
     if (mode == Mode::TANH_TABLE)
       {
