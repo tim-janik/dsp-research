@@ -54,7 +54,9 @@ class SaturationDSP
   static constexpr int table_size = 512;
   static constexpr int oversample = 8;
   std::array<float, table_size> table;
-  float factor = 1;
+  float current_drive = 0;
+  float dest_drive = 0;
+  float drive_max_step = 0;
   float current_mix = 1;
   float dest_mix = 1;
   float mix_max_step = 0;
@@ -95,7 +97,11 @@ public:
   void
   reset (unsigned int sample_rate)
   {
-    mix_max_step = 1 / (0.050 * sample_rate * oversample); // smooth mix range over 50ms
+    mix_max_step = 1 / (0.050 * sample_rate * oversample);    // smooth mix range over 50ms
+    drive_max_step = 6 / (0.010 * sample_rate * oversample);  // smooth factor delta of 6dB over 10ms
+
+    res_up_left->reset();
+    res_up_right->reset();
   }
   float
   lookup_table (float f)
@@ -106,9 +112,11 @@ public:
     return table[itbl_index] + frac * (table[itbl_index + 1] - table[itbl_index]);
   }
   void
-  set_factor (float f)
+  set_drive (float d, bool now)
   {
-    factor = f;
+    dest_drive = d;
+    if (now)
+      current_drive = dest_drive;
   }
   void
   set_mix (float percent, bool now)
@@ -134,44 +142,56 @@ public:
       res_up_right->process_block (right_in, n_samples, right_over);
 
     float mix_step = std::clamp ((dest_mix - current_mix) / n_samples / oversample, -mix_max_step, mix_max_step);
+    float drive_step = std::clamp ((dest_drive - current_drive) / (n_samples * oversample), -drive_max_step, drive_max_step);
+
+    float current_factor = exp2f (current_drive / 6);
+    float end_factor = exp2f ((current_drive + drive_step * n_samples * oversample) / 6);
+    float factor_step = (end_factor - current_factor) / (n_samples * oversample);
+
+    current_drive += drive_step * n_samples * oversample;
+
     if (mode == Mode::TANH_TABLE)
       {
         for (int i = 0; i < n_samples * oversample; i++)
           {
-            left_over[i] = lookup_table (left_over[i] * factor) * current_mix + left_over[i] * (1 - current_mix);
+            left_over[i] = lookup_table (left_over[i] * current_factor) * current_mix + left_over[i] * (1 - current_mix);
             if (STEREO)
-              right_over[i] = lookup_table (right_over[i] * factor) * current_mix + right_over[i] * (1 - current_mix);
+              right_over[i] = lookup_table (right_over[i] * current_factor) * current_mix + right_over[i] * (1 - current_mix);
             current_mix += mix_step;
+            current_factor += factor_step;
           }
       }
     if (mode == Mode::TANH_TRUE)
       {
         for (int i = 0; i < n_samples * oversample; i++)
           {
-            left_over[i] = std::tanh (left_over[i] * factor) * current_mix + left_over[i] * (1 - current_mix);
+            left_over[i] = std::tanh (left_over[i] * current_factor) * current_mix + left_over[i] * (1 - current_mix);
             if (STEREO)
-              right_over[i] = std::tanh (right_over[i] * factor) * current_mix + right_over[i] * (1 - current_mix);
+              right_over[i] = std::tanh (right_over[i] * current_factor) * current_mix + right_over[i] * (1 - current_mix);
             current_mix += mix_step;
+            current_factor += factor_step;
           }
       }
     if (mode == Mode::TANH_CHEAP)
       {
         for (int i = 0; i < n_samples * oversample; i++)
           {
-            left_over[i] = cheap_tanh (left_over[i] * factor) * current_mix + left_over[i] * (1 - current_mix);
+            left_over[i] = cheap_tanh (left_over[i] * current_factor) * current_mix + left_over[i] * (1 - current_mix);
             if (STEREO)
-              right_over[i] = cheap_tanh (right_over[i] * factor) * current_mix + right_over[i] * (1 - current_mix);
+              right_over[i] = cheap_tanh (right_over[i] * current_factor) * current_mix + right_over[i] * (1 - current_mix);
             current_mix += mix_step;
+            current_factor += factor_step;
           }
       }
     if (mode == Mode::HARD_CLIP)
       {
         for (int i = 0; i < n_samples * oversample; i++)
           {
-            left_over[i] = std::clamp (left_over[i] * factor, -1.f, 1.f) * current_mix + left_over[i] * (1 - current_mix);
+            left_over[i] = std::clamp (left_over[i] * current_factor, -1.f, 1.f) * current_mix + left_over[i] * (1 - current_mix);
             if (STEREO)
-              right_over[i] = std::clamp (right_over[i] * factor, -1.f, 1.f) * current_mix + right_over[i] * (1 - current_mix);
+              right_over[i] = std::clamp (right_over[i] * current_factor, -1.f, 1.f) * current_mix + right_over[i] * (1 - current_mix);
             current_mix += mix_step;
+            current_factor += factor_step;
           }
       }
 

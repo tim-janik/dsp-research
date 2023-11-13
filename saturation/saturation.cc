@@ -77,7 +77,7 @@ main (int argc, char **argv)
         {
           for (size_t i = 0; i < input.size(); i++)
             input[i] = sin (x++ * 4400. * 2 * M_PI / SR);
-          dist.set_factor (pow (2, 8.0 * x / SR / 5));
+          dist.set_drive (48.0 * x / SR / 5, true);
           dist.process<false> (input.data(), nullptr, output.data(), nullptr, 64);
           for (auto f : output)
             printf ("%f\n", f * 0.5);
