@@ -1,0 +1,8 @@
+- once we have automation, it is better to perform saturation in 3 steps
+  -> upsample whole input
+  -> saturation / automation with smaller blocks
+  -> downsample whole input
+- may want to process dry signal without oversampling
+- probably need DC blocker
+- could have better tanh approximation
+- may want to oversample higher than 8x
