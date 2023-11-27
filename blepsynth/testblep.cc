@@ -134,7 +134,7 @@ fft_snr (Osc& o, DCTest dc_test)
   vector<double> mag = compute_fft_mag (o, 8192, dc_test);
 
   /* this is required because the width of the window is hardcoded to [-32:32] in get_sig_noise_max() */
-  assert (mag.size() == 8192 * 8 + 1);
+  assert (mag.size() == 8192 * 8);
 
   double sig_max, noise_max, freq_max;
   get_sig_noise_max (mag, o, sig_max, noise_max, freq_max);
