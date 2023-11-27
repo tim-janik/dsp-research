@@ -3,14 +3,9 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <sys/time.h>
-#include <ase/gslfft.hh>
-#include <ase/asemathsignal.hh>
 #include <vector>
 #include <complex>
-#include "bleputils.hh"
-#include "bleposc.hh"
-
-using namespace Ase::BlepUtils;
+#include <glib.h>
 
 using std::vector;
 using std::string;
@@ -18,11 +13,11 @@ using std::complex;
 using std::max;
 using std::min;
 
-static double *
-complex_ptr (vector<complex<double>>& vec)
-{
-  return reinterpret_cast<double *> (&vec[0]);
-}
+
+#include "bleputils.hh"
+#include "bleposc.hh"
+
+using namespace Ase::BlepUtils;
 
 enum class DCTest {
   OFF,
@@ -33,7 +28,7 @@ static vector<double>
 compute_fft_mag (Osc& o, size_t N, DCTest dc_test)
 {
   size_t OVER = 8;
-  vector<complex<double>> in_ri (N * OVER), out_ri (N * OVER);
+  vector<complex<double>> in_ri (N * OVER);
 
   if (dc_test == DCTest::OFF)
     {
@@ -60,7 +55,7 @@ compute_fft_mag (Osc& o, size_t N, DCTest dc_test)
       in_ri[i] *= 2.0 / win_norm;
     }
 
-  gsl_power2_fftac (N * OVER, complex_ptr (in_ri), complex_ptr (out_ri));
+  auto out_ri = fft (in_ri);
 
   vector<double> out;
   for (auto ri : out_ri)
@@ -139,7 +134,7 @@ fft_snr (Osc& o, DCTest dc_test)
   vector<double> mag = compute_fft_mag (o, 8192, dc_test);
 
   /* this is required because the width of the window is hardcoded to [-32:32] in get_sig_noise_max() */
-  assert (mag.size() == 8192 * 8);
+  assert (mag.size() == 8192 * 8 + 1);
 
   double sig_max, noise_max, freq_max;
   get_sig_noise_max (mag, o, sig_max, noise_max, freq_max);
@@ -415,7 +410,7 @@ dc_report (vector<float>& dcs)
       dmax = max<double> (d, dmax);
       davg += d / dcs.size();
     }
-  return Ase::string_format ("avg %f range [%f, %f]", ase_db_from_factor (fabs (davg), -200), ase_db_from_factor (fabs (dmin), -200), ase_db_from_factor (fabs (dmax), -200));
+  return string_printf ("avg %f range [%f, %f]", ase_db_from_factor (fabs (davg), -200), ase_db_from_factor (fabs (dmin), -200), ase_db_from_factor (fabs (dmax), -200));
 }
 
 static void
@@ -507,6 +502,8 @@ exp2_func (double d)
   {
     case 0: return pow (2, d);
     case 1: return exp (d * 0.693147180559945);
+    default: assert (false);
+#if 0
     case 2: return ase_approx2_exp2 (d);
     case 3: return ase_approx3_exp2 (d);
     case 4: return ase_approx4_exp2 (d);
@@ -515,6 +512,7 @@ exp2_func (double d)
     case 7: return ase_approx7_exp2 (d);
     case 8: return ase_approx8_exp2 (d);
     case 9: return ase_approx9_exp2 (d);
+#endif
   }
 }
 template<int FN> std::string
@@ -524,7 +522,7 @@ exp2_label()
   {
     case 0: return "pow";
     case 1: return "exp";
-    default: return Ase::string_format ("approx%d_exp2", FN);
+    default: return string_printf ("approx%d_exp2", FN);
   }
 }
 
@@ -740,7 +738,7 @@ main (int argc, char **argv)
         lfo_test ();
       else
         {
-          Ase::printerr ("%s: unsupported test type '%s', try vnorm, fft, speed, speed2, reset, exp2 or snr\n", argv[0], test_name.c_str());
+          fprintf (stderr, "%s: unsupported test type '%s', try vnorm, fft, speed, speed2, reset, exp2 or snr\n", argv[0], test_name.c_str());
           return 1;
         }
       return 0;

@@ -1,9 +1,10 @@
 // This Source Code Form is licensed MPL-2.0: http://mozilla.org/MPL/2.0
-#ifndef __ASE_DEVICES_BLEPOSC_HH__
-#define __ASE_DEVICES_BLEPOSC_HH__
+#pragma once
 
-#include <ase/randomhash.hh>
-#include <ase/datautils.hh>
+#include <array>
+#include <algorithm>
+
+#include "aseutils.hh"
 
 namespace Ase {
 namespace BlepUtils {
@@ -436,7 +437,7 @@ public:
   double
   clamp (double d, double min, double max)
   {
-    return ASE_CLAMP (d, min, max);
+    return std::clamp (d, min, max);
   }
 
   /* check if slave oscillator has reached target_phase
@@ -709,5 +710,3 @@ public:
 
 } // BlepUtils
 } // Ase
-
-#endif // __ASE_DEVICES_BLEPOSC_HH__

@@ -1,6 +1,5 @@
 // This Source Code Form is licensed MPL-2.0: http://mozilla.org/MPL/2.0
-#ifndef __ASE_BLEPUTILS_HH__
-#define __ASE_BLEPUTILS_HH__
+#pragma once
 
 #include <assert.h>
 
@@ -42,5 +41,3 @@ window_kaiser (double x, double beta)
 
 }
 }
-
-#endif
