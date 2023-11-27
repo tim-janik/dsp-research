@@ -129,22 +129,25 @@ class BlepWidget(QtWidgets.QWidget):
     qp.begin(self)
     qp.fillRect (event.rect(), QtGui.QColor (255, 255, 255));
     xgreycolor = QtGui.QColor (240, 240, 240)
-    qp.fillRect (QtCore.QRect (0, 0, self.width() / 10, self.height()), xgreycolor)
-    qp.fillRect (QtCore.QRect (self.width() * 9 / 10, 0, self.width(), self.height()), xgreycolor)
+    qp.fillRect (QtCore.QRect (0, 0, self.width() // 10, self.height()), xgreycolor)
+    qp.fillRect (QtCore.QRect (self.width() * 9 // 10, 0, self.width(), self.height()), xgreycolor)
     xscale = self.width() / 2000 / 1.25
     xcenter = -self.width() / 5 * 3.5
     yscale = -self.height() / 4 * 0.75
     ycenter = self.height() / 2
     qp.setPen (QtGui.QColor (190, 190, 190))
-    qp.drawLine (0, ycenter + 1 * yscale, self.width(), ycenter + 1 * yscale)
-    qp.drawLine (0, ycenter + -1 * yscale, self.width(), ycenter + -1 * yscale)
-    qp.drawLine (self.width() / 2, 0, self.width() / 2, self.height())
+    qp.drawLine (0, round (ycenter + 1 * yscale), self.width(), round (ycenter + 1 * yscale))
+    qp.drawLine (0, round (ycenter + -1 * yscale), self.width(), round (ycenter + -1 * yscale))
+    qp.drawLine (self.width() // 2, 0, self.width() // 2, self.height())
     qp.setPen (QtCore.Qt.black)
     for i in range (len (self.plot_data) - 1):
-      qp.drawLine (i * xscale + xcenter, self.plot_data[i] * yscale + ycenter, (i + 1) * xscale + xcenter, self.plot_data[i+1] * yscale + ycenter)
+      qp.drawLine (round (i * xscale + xcenter),
+                   round (self.plot_data[i] * yscale + ycenter),
+                   round ((i + 1) * xscale + xcenter),
+                   round (self.plot_data[i+1] * yscale + ycenter))
 
     qp.setPen (QtGui.QColor(168, 34, 3))
-    qp.drawLine (0, ycenter, self.width(), ycenter)
+    qp.drawLine (0, round (ycenter), self.width(), round (ycenter))
 
     qp.end()
 
