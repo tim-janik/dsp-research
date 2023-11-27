@@ -130,7 +130,7 @@ fft (unsigned int n_values, const double *in, double *out)
 }
 
 static inline void
-ifft (unsigned int n_values, double *in, double *out)
+ifft (unsigned int n_values, const double *in, double *out)
 {
   assert ((n_values & (n_values - 1)) == 0); // power-of-two check
   auto plan_fft = fftw_plan_dft_1d (n_values, (fftw_complex *) in, (fftw_complex *) out, FFTW_BACKWARD, FFTW_ESTIMATE | FFTW_PRESERVE_INPUT);
@@ -147,5 +147,13 @@ fft (const std::vector<std::complex<double>>& in)
 {
   std::vector<std::complex<double>> out (in.size());
   fft (in.size(), reinterpret_cast<const double *> (in.data()), reinterpret_cast<double *> (out.data()));
+  return out;
+}
+
+static inline std::vector<std::complex<double>>
+ifft (const std::vector<std::complex<double>>& in)
+{
+  std::vector<std::complex<double>> out (in.size());
+  ifft (in.size(), reinterpret_cast<const double *> (in.data()), reinterpret_cast<double *> (out.data()));
   return out;
 }

@@ -22,12 +22,6 @@ sinc (double x)
   return fabs (x) > 1e-8 ? sin (x * M_PI) / (x * M_PI) : 1;
 }
 
-static double *
-complex_ptr (vector<complex<double>>& vec)
-{
-  return reinterpret_cast<double *> (&vec[0]);
-}
-
 static void
 print_fir_response (const vector<double>& fir,
                     const string& label)
@@ -36,13 +30,13 @@ print_fir_response (const vector<double>& fir,
   while (fir.size() * 8 >= N)
     N *= 2;
 
-  vector<complex<double>> in_ri (N + 1), out_ri (N + 1);
+  vector<complex<double>> in_ri (N);
 
   for (size_t i = 0; i < N; i++)
     if (i < fir.size())
       in_ri[i] = fir[i];
 
-  fft (N, complex_ptr (in_ri), complex_ptr (out_ri));
+  auto out_ri = fft (in_ri);
   for (size_t i = 0; i <= N / 2; i++)
     {
       double d = i / double (N) * 2;
@@ -242,17 +236,16 @@ main (int argc, char **argv)
     }
 
   const size_t M = next_power_of_two (N * 128);
-  vector<complex<double>> theta_ri (M + 1);
-  vector<complex<double>> mag_ri (M + 1);
-  vector<complex<double>> fir_ri (M + 1);
+  vector<complex<double>> theta_ri (M);
+  vector<complex<double>> fir_ri (M);
 
   /* build zero padded impulse response */
 
   for (size_t i = 0; i < fir_filter.size(); i++)
     fir_ri[i] = fir_filter[i];
 
-  fft (M, complex_ptr (fir_ri), complex_ptr (mag_ri));   /* get spectrum */
-  for (size_t i = 0; i <= M; i++)
+  auto mag_ri = fft (fir_ri);   /* get spectrum */
+  for (size_t i = 0; i < M; i++)
     {
       mag_ri[i] = std::complex<double> (mag_ri[i].real(), -mag_ri[i].imag()); // FIXME: should be done by fft wrapper
 
@@ -261,24 +254,23 @@ main (int argc, char **argv)
     }
 
   double offset = 0.0;
-  for (size_t i = 0; i <= M; i++)
+  for (size_t i = 0; i < M; i++)
     offset = max (-mag_ri[i].real(), offset);
 
   /* sqrt for magnitudes */
-  for (size_t i = 0; i <= M; i++)
+  for (size_t i = 0; i < M; i++)
     mag_ri[i] = sqrt (mag_ri[i].real() + offset) + 1e-10;
 
   /* compute log|X(n)| */
-  for (size_t i = 0; i <= M; i++)
+  for (size_t i = 0; i < M; i++)
     {
       theta_ri[i] = log (mag_ri[i].real());
     }
 
-  vector<complex<double>> theta_ri_ifft (M + 1);
-  ifft (M, complex_ptr (theta_ri), complex_ptr (theta_ri_ifft));    /* IFFT */
+  auto theta_ri_ifft = ifft (theta_ri);    /* IFFT */
 
   /* pointwise multiplication with sig vector */
-  for (size_t i = 0; i <= M; i++)
+  for (size_t i = 0; i < M; i++)
     {
       double sign;
       if (i % (M/2) == 0)
@@ -296,9 +288,9 @@ main (int argc, char **argv)
       sign /= M; // FIXME: should be done by fft wrapper
       theta_ri_ifft[i] *= sign;
     }
-  fft (M, complex_ptr (theta_ri_ifft), complex_ptr (theta_ri));   /* FFT */
+  theta_ri = fft (theta_ri_ifft);   /* FFT */
 
-  for (size_t i = 0; i <= M; i++)
+  for (size_t i = 0; i < M; i++)
     {
       /* multiplication with -j */
       theta_ri[i] *= complex<double> (0, -1);
@@ -307,18 +299,17 @@ main (int argc, char **argv)
   // so far, we have computed
   // theta[i] = -j * DFT (sign[i] * IDFT (a[i]))
 
-  vector<complex<double>> minphase_spect (M + 1);
-  for (size_t i = 0; i < M + 1; i++)
+  vector<complex<double>> minphase_spect (M);
+  for (size_t i = 0; i < M; i++)
     {
       /* |X[i]| * exp(j*t(i)) */
       complex<double> j (0, 1);
       minphase_spect[i] = mag_ri[i].real() * exp (j * theta_ri[i]);
     }
 
-  vector<complex<double>> minphase_fir (M + 1);
   vector<double> minphase (N);
-  ifft (M, complex_ptr (minphase_spect), complex_ptr (minphase_fir));   /* IFFT */
-  for (size_t i = 0; i <= M; i++)
+  auto minphase_fir = ifft (minphase_spect);   /* IFFT */
+  for (size_t i = 0; i < M; i++)
     {
       if (trace)
         printf ("# minphase_fir[%zd] = %f %f\n", i, minphase_fir[i].real(), minphase_fir[i].imag());
