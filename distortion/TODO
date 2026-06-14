@@ -1,8 +1,5 @@
-- change DistortionPlugin parameter bw -> Q
 - pre-eq
 - post-filters
-  -> resonance normalization
 - sin-folding distortion
 - hard clipper
-- approximate tan? from dsp-research/filters
 - -fno-tree-slp-vectorize should not be global
