@@ -79,7 +79,7 @@ public:
     cutoff_warp_factor = M_PI / sample_rate;
   }
   void
-  set_params (Output output, float sample_rate, float cutoff, float Q_inv, float gain_db)
+  set_params (Output output, float cutoff, float Q_inv, float gain_db)
   {
     if (output == LP || output == BP || output == HP || output == NOTCH)
       {
@@ -90,18 +90,18 @@ public:
           m_bp = 2 * R;
       }
     else if (output == PEQ)
-      set_peq_params_A (sample_rate, cutoff, Q_inv, powf (10, gain_db / 40));
+      set_peq_params_A (cutoff, Q_inv, powf (10, gain_db / 40));
     else if (output == LSH)
-      set_lsh_params_M (sample_rate, cutoff, Q_inv, powf (10, gain_db / 80));
+      set_lsh_params_M (cutoff, Q_inv, powf (10, gain_db / 80));
     else if (output == HSH)
-      set_hsh_params_M (sample_rate, cutoff, Q_inv, powf (10, gain_db / 80));
+      set_hsh_params_M (cutoff, Q_inv, powf (10, gain_db / 80));
     else
       {
         assert (false);
       }
   }
   void
-  set_peq_params_A (float sample_rate, float cutoff, float Q_inv, float A)
+  set_peq_params_A (float cutoff, float Q_inv, float A)
   {
     float R = Q_inv / (2 * A);
 
@@ -111,7 +111,7 @@ public:
     m_bp = A * Q_inv;
   }
   void
-  set_lsh_params_M (float sample_rate, float cutoff, float Q_inv, float M)
+  set_lsh_params_M (float cutoff, float Q_inv, float M)
   {
     float R = 0.5f * Q_inv;
     float A = M * M;
@@ -122,7 +122,7 @@ public:
     set_params_gR (R);
   }
   void
-  set_hsh_params_M (float sample_rate, float cutoff, float Q_inv, float M)
+  set_hsh_params_M (float cutoff, float Q_inv, float M)
   {
     float R = 0.5f * Q_inv;
     float A = M * M;
@@ -134,7 +134,7 @@ public:
   }
   template<Output output>
   void
-  process_mod (float *left, float *right, float sample_rate, float *freq_in, float R, float *gain_db_in, uint n_frames)
+  process_mod (float *left, float *right, float *freq_in, float R, float *gain_db_in, uint n_frames)
   {
     if (!n_frames)
       return;
@@ -171,22 +171,22 @@ public:
           {
             if constexpr (output == PEQ)
               {
-                set_peq_params_A (sample_rate, freq_in[i + j], R, F);
+                set_peq_params_A (freq_in[i + j], R, F);
                 F += delta_F;
               }
             else if constexpr (output == LSH)
               {
-                set_lsh_params_M (sample_rate, freq_in[i + j], R, F);
+                set_lsh_params_M (freq_in[i + j], R, F);
                 F += delta_F;
               }
             else if constexpr (output == HSH)
               {
-                set_hsh_params_M (sample_rate, freq_in[i + j], R, F);
+                set_hsh_params_M (freq_in[i + j], R, F);
                 F += delta_F;
               }
             else
               {
-                g = tan_approx (float (M_PI) * freq_in[i + j] / sample_rate);
+                g = cutoff_warp (freq_in[i + j]);
 
                 set_params_gR (0.5f * R);
 
@@ -307,23 +307,23 @@ public:
       }
   }
   void
-  process_mod (SVF::Output output, float *left, float *right, float sample_rate, float *freq_in, float R, float *gain_db_in, uint n_frames)
+  process_mod (SVF::Output output, float *left, float *right, float *freq_in, float R, float *gain_db_in, uint n_frames)
   {
     switch (output)
       {
-        case LP:    process_mod<LP> (left, right, sample_rate, freq_in, R, gain_db_in, n_frames);
+        case LP:    process_mod<LP> (left, right, freq_in, R, gain_db_in, n_frames);
                     break;
-        case BP:    process_mod<BP> (left, right, sample_rate, freq_in, R, gain_db_in, n_frames);
+        case BP:    process_mod<BP> (left, right, freq_in, R, gain_db_in, n_frames);
                     break;
-        case HP:    process_mod<HP> (left, right, sample_rate, freq_in, R, gain_db_in, n_frames);
+        case HP:    process_mod<HP> (left, right, freq_in, R, gain_db_in, n_frames);
                     break;
-        case PEQ:   process_mod<PEQ> (left, right, sample_rate, freq_in, R, gain_db_in, n_frames);
+        case PEQ:   process_mod<PEQ> (left, right, freq_in, R, gain_db_in, n_frames);
                     break;
-        case LSH:   process_mod<LSH> (left, right, sample_rate, freq_in, R, gain_db_in, n_frames);
+        case LSH:   process_mod<LSH> (left, right, freq_in, R, gain_db_in, n_frames);
                     break;
-        case HSH:   process_mod<HSH> (left, right, sample_rate, freq_in, R, gain_db_in, n_frames);
+        case HSH:   process_mod<HSH> (left, right, freq_in, R, gain_db_in, n_frames);
                     break;
-        case NOTCH: process_mod<NOTCH> (left, right, sample_rate, freq_in, R, gain_db_in, n_frames);
+        case NOTCH: process_mod<NOTCH> (left, right, freq_in, R, gain_db_in, n_frames);
                     break;
         default:    assert (false);
       }
@@ -564,7 +564,7 @@ public:
 
     if (filters_enabled)
       {
-        pre_eq_filter.set_params (SVF::PEQ, sample_rate, pre_eq_freq, pre_eq_Q, pre_eq_gain);
+        pre_eq_filter.set_params (SVF::PEQ, pre_eq_freq, pre_eq_Q, pre_eq_gain);
         pre_eq_filter.process_block (SVF::PEQ, left_in, right_in, n_samples);
       }
 
@@ -734,8 +734,8 @@ out:
 
     if (filters_enabled)
       {
-        post_lp_filter.set_params (SVF::LP, sample_rate, post_lp_freq, 1 / sqrt (2), 0);
-        post_hp_filter.set_params (SVF::HP, sample_rate, post_hp_freq, 1 / sqrt (2), 0);
+        post_lp_filter.set_params (SVF::LP, post_lp_freq, 1 / sqrt (2), 0);
+        post_hp_filter.set_params (SVF::HP, post_hp_freq, 1 / sqrt (2), 0);
         post_lp_filter.process_block (SVF::LP, left_in, right_in, n_samples);
         post_hp_filter.process_block (SVF::HP, left_in, right_in, n_samples);
       }

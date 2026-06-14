@@ -310,7 +310,7 @@ main (int argc, char **argv)
 
       if (strcmp (argv[1], "sweep-svf") == 0)
         {
-          svf.set_params (output, SR, cutoff, 1 / Q, gain_db);
+          svf.set_params (output, cutoff, 1 / Q, gain_db);
           svf.process_block (output, buffer, buffer2, 5 * SR);
         }
       else
@@ -322,7 +322,7 @@ main (int argc, char **argv)
               freq[i] = cutoff;
               gain_in[i] = gain_db;
             }
-          svf.process_mod (output, buffer, buffer2, SR, freq, 1 / Q, gain_in, 5 * SR);
+          svf.process_mod (output, buffer, buffer2, freq, 1 / Q, gain_in, 5 * SR);
         }
       for (int i = 0; i < 5*SR; i++)
         {
@@ -349,7 +349,7 @@ main (int argc, char **argv)
             {
               SVF::Output output = (SVF::Output) o;
 
-              svf.set_params (output, 48000, freq[0], 1 / sqrt (2), gain_db[0]);
+              svf.set_params (output, freq[0], 1 / sqrt (2), gain_db[0]);
 
               double start_t = get_time();
               const int blocks = 50 * 1000;
@@ -357,23 +357,7 @@ main (int argc, char **argv)
                 {
                   for (int b = 0; b < blocks; b++)
                     {
-                      switch (output)
-                        {
-                          case SVF::LP:     svf.process_mod<SVF::LP> (left, right, 48000, freq, 1, gain_db, block_size);
-                                            break;
-                          case SVF::BP:     svf.process_mod<SVF::BP> (left, right, 48000, freq, 1, gain_db, block_size);
-                                            break;
-                          case SVF::HP:     svf.process_mod<SVF::HP> (left, right, 48000, freq, 1, gain_db, block_size);
-                                            break;
-                          case SVF::PEQ:    svf.process_mod<SVF::PEQ> (left, right, 48000, freq, 1, gain_db, block_size);
-                                            break;
-                          case SVF::LSH:    svf.process_mod<SVF::LSH> (left, right, 48000, freq, 1, gain_db, block_size);
-                                            break;
-                          case SVF::HSH:    svf.process_mod<SVF::HSH> (left, right, 48000, freq, 1, gain_db, block_size);
-                                            break;
-                          case SVF::NOTCH:  svf.process_mod<SVF::NOTCH> (left, right, 48000, freq, 1, gain_db, block_size);
-                                            break;
-                        }
+                      svf.process_mod (output, left, right, freq, 1, gain_db, block_size);
                     }
                 }
               else
@@ -410,7 +394,7 @@ main (int argc, char **argv)
           freq[i] = 1000; // * exp2 (lfo * 4);
           gain_db[i] = 20 + lfo * 10; //(i % 50) * 0.0001;
         }
-      svf.process_mod<SVF::PEQ> (buffer, buffer2, SR, freq, 1, gain_db, 5 * SR);
+      svf.process_mod<SVF::PEQ> (buffer, buffer2, freq, 1, gain_db, 5 * SR);
       for (int i = 0; i < 5*SR; i++)
         {
           //filter.process_peq_mono (buffer + i, 1000 * exp2 (lfo * 2), 1, 20, 1);
