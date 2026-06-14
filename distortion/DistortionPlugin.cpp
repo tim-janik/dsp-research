@@ -60,7 +60,7 @@ public:
 
       addParameter (pre_eq_freq = new AudioParameterFloat ({ "pre_eq_freq", 1 }, "EQ Freq", freq_range, 1000.0f));
       addParameter (pre_eq_gain = new AudioParameterFloat ({ "pre_eq_gain", 1 }, "EQ Gain", -24.f, 24.f, 12.f));
-      addParameter (pre_eq_bw = new AudioParameterFloat ({"pre_eq_bw", 1 }, "EQ BW", 0.1f, 10.f, 1.f));
+      addParameter (pre_eq_Q = new AudioParameterFloat ({"pre_eq_Q", 1 }, "EQ Q", 0.1f, 10.f, 1.f));
       addParameter (post_hp_freq = new AudioParameterFloat ({"post_hp_freq", 1 }, "Post HP Freq", hp_freq_range, 80.f));
       addParameter (post_lp_freq = new AudioParameterFloat ({"post_lp_freq", 1 }, "Post LP Freq", lp_freq_range, 8000.f));
     }
@@ -89,7 +89,7 @@ public:
      distortion_dsp.set_drive (drive->get());
      distortion_dsp.set_symmetry (symmetry->get());
      distortion_dsp.set_mode (mode->getIndex());
-     distortion_dsp.set_pre_eq_params (pre_eq_freq->get(), pre_eq_gain->get(), pre_eq_bw->get());
+     distortion_dsp.set_pre_eq_params (pre_eq_freq->get(), pre_eq_gain->get(), pre_eq_Q->get());
      distortion_dsp.set_post_lp (post_lp_freq->get());
      distortion_dsp.set_post_hp (post_hp_freq->get());
      distortion_dsp.set_mix (mix->get());
@@ -158,7 +158,7 @@ private:
     AudioParameterFloat* bias;
     AudioParameterFloat* pre_eq_freq;
     AudioParameterFloat* pre_eq_gain;
-    AudioParameterFloat* pre_eq_bw;
+    AudioParameterFloat* pre_eq_Q;
     AudioParameterFloat* post_lp_freq;
     AudioParameterFloat* post_hp_freq;
     AudioParameterChoice* mode;

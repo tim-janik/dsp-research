@@ -563,7 +563,8 @@ public:
 
     if (filters_enabled)
       {
-        pre_eq_filter.set_params (SVF::PEQ, pre_eq_freq, pre_eq_Q, pre_eq_gain);
+        float Q_inv = 1 / pre_eq_Q;
+        pre_eq_filter.set_params (SVF::PEQ, pre_eq_freq, Q_inv, pre_eq_gain);
         pre_eq_filter.process_block (SVF::PEQ, left_in, right_in, n_samples);
       }
 
