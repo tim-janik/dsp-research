@@ -316,13 +316,15 @@ main (int argc, char **argv)
       else
         {
           float freq[5 * SR];
+          float Q_inv_in[5 * SR];
           float gain_in[5 * SR];
           for (int i = 0; i < 5 * SR; i++)
             {
               freq[i] = cutoff;
+              Q_inv_in[i] = 1 / Q;
               gain_in[i] = gain_db;
             }
-          svf.process_mod (output, buffer, buffer2, freq, 1 / Q, gain_in, 5 * SR);
+          svf.process_mod (output, buffer, buffer2, freq, Q_inv_in, gain_in, 5 * SR);
         }
       for (int i = 0; i < 5*SR; i++)
         {
@@ -335,12 +337,13 @@ main (int argc, char **argv)
       svf.reset (48000);
 
       const int block_size = 512;
-      float left[block_size], right[block_size], freq[block_size], gain_db[block_size];
+      float left[block_size], right[block_size], freq[block_size], Q_inv[block_size], gain_db[block_size];
 
       for (int i = 0; i < block_size; i++)
         {
           left[i] = right[i] = ((i % 100) - 50) / 50;
           freq[i] = 440 + i;
+          Q_inv[i] = 0.7 + i* 0.0001;
           gain_db[i] = 20 + i * 0.0001;
         }
       for (bool modulation : { true, false })
@@ -357,7 +360,7 @@ main (int argc, char **argv)
                 {
                   for (int b = 0; b < blocks; b++)
                     {
-                      svf.process_mod (output, left, right, freq, 1, gain_db, block_size);
+                      svf.process_mod (output, left, right, freq, Q_inv, gain_db, block_size);
                     }
                 }
               else
@@ -382,7 +385,7 @@ main (int argc, char **argv)
       int SR = 44100;
       svf.reset (SR);
 
-      float buffer[5*SR], buffer2[5*SR], freq[5*SR], gain_db[5*SR];
+      float buffer[5*SR], buffer2[5*SR], freq[5*SR], Q_inv[5*SR], gain_db[5*SR];
       double phase = 0;
       for (int i = 0; i < 5*SR; i++)
         {
@@ -392,9 +395,10 @@ main (int argc, char **argv)
           buffer[i] = ((i % 300) - 150)/300.;
           buffer2[i] = buffer[i];
           freq[i] = 1000; // * exp2 (lfo * 4);
+          Q_inv[i] = 1;
           gain_db[i] = 20 + lfo * 10; //(i % 50) * 0.0001;
         }
-      svf.process_mod<SVF::PEQ> (buffer, buffer2, freq, 1, gain_db, 5 * SR);
+      svf.process_mod<SVF::PEQ> (buffer, buffer2, freq, Q_inv, gain_db, 5 * SR);
       for (int i = 0; i < 5*SR; i++)
         {
           //filter.process_peq_mono (buffer + i, 1000 * exp2 (lfo * 2), 1, 20, 1);

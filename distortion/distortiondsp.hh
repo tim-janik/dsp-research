@@ -134,7 +134,7 @@ public:
   }
   template<Output output>
   void
-  process_mod (float *left, float *right, float *freq_in, float R, float *gain_db_in, uint n_frames)
+  process_mod (float *left, float *right, float *freq_in, float *Q_inv_in, float *gain_db_in, uint n_frames)
   {
     if (!n_frames)
       return;
@@ -169,29 +169,32 @@ public:
           }
         for (uint j = 0; j < todo; j++)
           {
+            const float freq = freq_in[i + j];
+            const float Q_inv = Q_inv_in[i + j];
+
             if constexpr (output == PEQ)
               {
-                set_peq_params_A (freq_in[i + j], R, F);
+                set_peq_params_A (freq, Q_inv, F);
                 F += delta_F;
               }
             else if constexpr (output == LSH)
               {
-                set_lsh_params_M (freq_in[i + j], R, F);
+                set_lsh_params_M (freq, Q_inv, F);
                 F += delta_F;
               }
             else if constexpr (output == HSH)
               {
-                set_hsh_params_M (freq_in[i + j], R, F);
+                set_hsh_params_M (freq, Q_inv, F);
                 F += delta_F;
               }
             else
               {
-                g = cutoff_warp (freq_in[i + j]);
+                g = cutoff_warp (freq);
 
-                set_params_gR (0.5f * R);
+                set_params_gR (0.5f * Q_inv);
 
                 if (output == BP)
-                  m_bp = R;
+                  m_bp = Q_inv;
               }
             process_s<output> (left + i + j, right + i + j);
           }
@@ -307,23 +310,23 @@ public:
       }
   }
   void
-  process_mod (SVF::Output output, float *left, float *right, float *freq_in, float R, float *gain_db_in, uint n_frames)
+  process_mod (SVF::Output output, float *left, float *right, float *freq_in, float *Q_inv_in, float *gain_db_in, uint n_frames)
   {
     switch (output)
       {
-        case LP:    process_mod<LP> (left, right, freq_in, R, gain_db_in, n_frames);
+        case LP:    process_mod<LP> (left, right, freq_in, Q_inv_in, gain_db_in, n_frames);
                     break;
-        case BP:    process_mod<BP> (left, right, freq_in, R, gain_db_in, n_frames);
+        case BP:    process_mod<BP> (left, right, freq_in, Q_inv_in, gain_db_in, n_frames);
                     break;
-        case HP:    process_mod<HP> (left, right, freq_in, R, gain_db_in, n_frames);
+        case HP:    process_mod<HP> (left, right, freq_in, Q_inv_in, gain_db_in, n_frames);
                     break;
-        case PEQ:   process_mod<PEQ> (left, right, freq_in, R, gain_db_in, n_frames);
+        case PEQ:   process_mod<PEQ> (left, right, freq_in, Q_inv_in, gain_db_in, n_frames);
                     break;
-        case LSH:   process_mod<LSH> (left, right, freq_in, R, gain_db_in, n_frames);
+        case LSH:   process_mod<LSH> (left, right, freq_in, Q_inv_in, gain_db_in, n_frames);
                     break;
-        case HSH:   process_mod<HSH> (left, right, freq_in, R, gain_db_in, n_frames);
+        case HSH:   process_mod<HSH> (left, right, freq_in, Q_inv_in, gain_db_in, n_frames);
                     break;
-        case NOTCH: process_mod<NOTCH> (left, right, freq_in, R, gain_db_in, n_frames);
+        case NOTCH: process_mod<NOTCH> (left, right, freq_in, Q_inv_in, gain_db_in, n_frames);
                     break;
         default:    assert (false);
       }
