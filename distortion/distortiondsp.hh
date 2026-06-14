@@ -54,10 +54,11 @@ class SVF
   }
 
   void
-  set_params_gR (float R)
+  set_params_g_Q_inv (float Q_inv)
   {
-    d = 1.f / (1 + 2*R*g + g*g);
-    g1 = 2 * R + g;
+    /* instead of using R to compute the SVF parameters, use Q_inv == 1 / Q == 2 * R */
+    d = 1.f / (1 + Q_inv*g + g*g);
+    g1 = Q_inv + g;
   }
 public:
   enum Output {
@@ -83,11 +84,10 @@ public:
   {
     if (output == LP || output == BP || output == HP || output == NOTCH)
       {
-        float R = 0.5f * Q_inv;
         g = cutoff_warp (cutoff);
-        set_params_gR (R);
+        set_params_g_Q_inv (Q_inv);
         if (output == BP)
-          m_bp = 2 * R;
+          m_bp = Q_inv;
       }
     else if (output == PEQ)
       set_peq_params_A (cutoff, Q_inv, powf (10, gain_db / 40));
@@ -103,34 +103,30 @@ public:
   void
   set_peq_params_A (float cutoff, float Q_inv, float A)
   {
-    float R = Q_inv / (2 * A);
-
     g = cutoff_warp (cutoff);
-    set_params_gR (R);
+    set_params_g_Q_inv (Q_inv / A);
 
     m_bp = A * Q_inv;
   }
   void
   set_lsh_params_M (float cutoff, float Q_inv, float M)
   {
-    float R = 0.5f * Q_inv;
     float A = M * M;
 
     m_lp = A * A;
-    m_bp = A * 2 * R;
+    m_bp = A * Q_inv;
     g = cutoff_warp (cutoff) / M;
-    set_params_gR (R);
+    set_params_g_Q_inv (Q_inv);
   }
   void
   set_hsh_params_M (float cutoff, float Q_inv, float M)
   {
-    float R = 0.5f * Q_inv;
     float A = M * M;
 
-    m_bp = A * 2 * R;
+    m_bp = A * Q_inv;
     m_hp = A * A;
     g = cutoff_warp (cutoff) * M;
-    set_params_gR (R);
+    set_params_g_Q_inv (Q_inv);
   }
   template<Output output>
   void
@@ -191,7 +187,7 @@ public:
               {
                 g = cutoff_warp (freq);
 
-                set_params_gR (0.5f * Q_inv);
+                set_params_g_Q_inv (Q_inv);
 
                 if (output == BP)
                   m_bp = Q_inv;
