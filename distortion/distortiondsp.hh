@@ -733,8 +733,11 @@ out:
 
     if (filters_enabled)
       {
-        post_lp_filter.set_params (SVF::LP, post_lp_freq, 1 / sqrt (2), 0);
-        post_hp_filter.set_params (SVF::HP, post_hp_freq, 1 / sqrt (2), 0);
+        constexpr double BUTTERWORTH_Q = M_SQRT1_2; /* 1 / sqrt (2) */
+        constexpr float Q_inv = 1 / BUTTERWORTH_Q;
+
+        post_lp_filter.set_params (SVF::LP, post_lp_freq, Q_inv, 0);
+        post_hp_filter.set_params (SVF::HP, post_hp_freq, Q_inv, 0);
         post_lp_filter.process_block (SVF::LP, left_in, right_in, n_samples);
         post_hp_filter.process_block (SVF::HP, left_in, right_in, n_samples);
       }
