@@ -12,6 +12,11 @@ template <SmootherType smoother_type>
 class ParamSmoother
 {
 public:
+  ParamSmoother (float start_value)
+  {
+    set_target (start_value);
+  }
+
   /**
    * Initializes the smoother with sample rate and ramp time constants.
    */

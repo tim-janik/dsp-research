@@ -409,16 +409,16 @@ class DistortionDSP
   int    sample_rate = 44100;
 
   SVF                                       pre_eq_filter;
-  ParamSmoother<SmootherType::logarithmic>  pre_eq_freq_smoother;
-  ParamSmoother<SmootherType::logarithmic>  pre_eq_Q_inv_smoother;
-  ParamSmoother<SmootherType::linear>       pre_eq_gain_smoother;
+  ParamSmoother<SmootherType::logarithmic>  pre_eq_freq_smoother  { 1000 };
+  ParamSmoother<SmootherType::logarithmic>  pre_eq_Q_inv_smoother { 1 };
+  ParamSmoother<SmootherType::linear>       pre_eq_gain_smoother  { 6 };
 
 
   SVF                                       post_lp_filter;
-  ParamSmoother<SmootherType::logarithmic>  post_lp_freq_smoother;
+  ParamSmoother<SmootherType::logarithmic>  post_lp_freq_smoother { 20000 };
 
   SVF                                       post_hp_filter;
-  ParamSmoother<SmootherType::logarithmic>  post_hp_freq_smoother;
+  ParamSmoother<SmootherType::logarithmic>  post_hp_freq_smoother { 20 };
 
   StereoDelay<64> dry_delay;
 
@@ -451,16 +451,6 @@ class DistortionDSP
       }
   }
 public:
-  DistortionDSP()
-  {
-    /* smoother defaults */
-    pre_eq_freq_smoother.set_target (1000, true);
-    pre_eq_Q_inv_smoother.set_target (1, true);
-    pre_eq_gain_smoother.set_target (6, true);
-
-    post_lp_freq_smoother.set_target (20000, true);
-    post_hp_freq_smoother.set_target (20, true);
-  }
   void
   reset (int sample_rate)
   {
