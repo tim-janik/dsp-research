@@ -407,9 +407,10 @@ class DistortionDSP
   bool filters_enabled = true;
 
   SVF    pre_eq_filter;
-  float  pre_eq_freq = 1000;
-  float  pre_eq_Q    = 1;
-  float  pre_eq_gain = 6;
+  ParamSmoother<SmootherType::logarithmic>  pre_eq_freq_smoother;
+  ParamSmoother<SmootherType::logarithmic>  pre_eq_Q_inv_smoother;
+  ParamSmoother<SmootherType::linear>       pre_eq_gain_smoother;
+
   int    sample_rate = 44100;
 
   SVF    post_lp_filter;
@@ -453,6 +454,10 @@ public:
   DistortionDSP()
   {
     /* smoother defaults */
+    pre_eq_freq_smoother.set_target (1000, true);
+    pre_eq_Q_inv_smoother.set_target (1, true);
+    pre_eq_gain_smoother.set_target (6, true);
+
     post_lp_freq_smoother.set_target (20000, true);
   }
   void
@@ -462,6 +467,10 @@ public:
     post_lp_filter.reset (sample_rate);
     post_hp_filter.reset (sample_rate);
 
+    pre_eq_freq_smoother.reset (sample_rate, 0.025);
+    pre_eq_Q_inv_smoother.reset (sample_rate, 0.025);
+    pre_eq_gain_smoother.reset (sample_rate, 0.025);
+
     post_lp_freq_smoother.reset (sample_rate, 0.025);
 
     this->sample_rate = sample_rate;
@@ -470,11 +479,11 @@ public:
     dry_delay.reset();
   }
   void
-  set_pre_eq_params (float freq, float gain, float Q)
+  set_pre_eq_params (float freq, float gain, float Q, bool now)
   {
-    pre_eq_freq = freq;
-    pre_eq_gain = gain;
-    pre_eq_Q = Q;
+    pre_eq_freq_smoother.set_target (freq, now);
+    pre_eq_Q_inv_smoother.set_target (1 / Q, now);
+    pre_eq_gain_smoother.set_target (gain, now);
   }
   void
   set_post_lp (float lp_freq, bool now)
@@ -572,9 +581,18 @@ public:
 
     if (filters_enabled)
       {
-        float Q_inv = 1 / pre_eq_Q;
-        pre_eq_filter.set_params (SVF::PEQ, pre_eq_freq, Q_inv, pre_eq_gain);
-        pre_eq_filter.process_block (SVF::PEQ, left_in, right_in, n_samples);
+        float freq_peq[n_samples];
+        float Q_inv_peq[n_samples];
+        float gain_peq[n_samples];
+
+        pre_eq_freq_smoother.process_block (freq_peq, n_samples);
+        pre_eq_Q_inv_smoother.process_block (Q_inv_peq, n_samples);
+        pre_eq_gain_smoother.process_block (gain_peq, n_samples);
+
+        pre_eq_filter.process_mod (SVF::PEQ, left_in, right_in, freq_peq, Q_inv_peq, gain_peq, n_samples);
+        //float Q_inv = 1 / pre_eq_Q;
+        //pre_eq_filter.set_params (SVF::PEQ, pre_eq_freq, Q_inv, pre_eq_gain);
+        //pre_eq_filter.process_block (SVF::PEQ, left_in, right_in, n_samples);
       }
 
     float left_over_raw[over_delay + oversample * n_samples];

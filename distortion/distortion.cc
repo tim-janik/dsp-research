@@ -175,7 +175,7 @@ main (int argc, char **argv)
       distortion_dsp.set_oversample (1);
       distortion_dsp.set_drive (0);
       distortion_dsp.set_symmetry (0);
-      distortion_dsp.set_pre_eq_params (1000, 0, 1);
+      distortion_dsp.set_pre_eq_params (1000, 0, 1, true);
       distortion_dsp.reset (44100);
       distortion_dsp.enable_filters (false);
       const double eps = 0.0011;
@@ -235,7 +235,7 @@ main (int argc, char **argv)
       distortion_dsp.set_drive (-20);
       distortion_dsp.set_symmetry (0);
       distortion_dsp.set_mix (100);
-      distortion_dsp.set_pre_eq_params (1000, 12, 1);
+      distortion_dsp.set_pre_eq_params (1000, 12, 1, true);
       for (auto freq_hz : { 110.0, 220.0, 440.0, 880.0, 1000.0, 2000.0, 4000.0, 8000.0, 16000.0 })
         {
           LatencyTester ltest (44100, freq_hz, &distortion_dsp);
@@ -263,7 +263,7 @@ main (int argc, char **argv)
       distortion_dsp.set_oversample (4);
       distortion_dsp.set_drive (0);
       distortion_dsp.set_symmetry (0);
-      distortion_dsp.set_pre_eq_params (1000, 12, 1);
+      distortion_dsp.set_pre_eq_params (1000, 12, 1, true);
       distortion_dsp.set_mix (mix);
       int i = 0;
       while (i < 5 * SR)
