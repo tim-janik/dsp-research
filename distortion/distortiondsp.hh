@@ -136,17 +136,17 @@ public:
     if (!n_frames)
       return;
 
-    auto convert_gain_to_F = [] (float gain)
+    auto convert_gain_to_F = [gain_db_in] (uint i)
       {
         if constexpr (output == PEQ)
-          return powf (10, gain / 40);
+          return powf (10, gain_db_in[i] / 40);
         else if constexpr (output == LSH || output == HSH)
-          return powf (10, gain / 80);
+          return powf (10, gain_db_in[i] / 80);
         else
           return 0.f;
       };
     static constexpr int BS = 16;
-    float next_F = convert_gain_to_F (gain_db_in[0]);
+    float next_F = convert_gain_to_F (0);
     uint i = 0;
     while (i < n_frames)
       {
@@ -156,12 +156,12 @@ public:
         uint todo = std::min<uint> (BS, n_frames - i);
         if (n_frames - i > BS)
           {
-            next_F = convert_gain_to_F (gain_db_in[i + BS]);
+            next_F = convert_gain_to_F (i + BS);
             delta_F = (next_F - F) / BS;
           }
         else if (todo > 1)
           {
-            next_F = convert_gain_to_F (gain_db_in[i + todo - 1]);
+            next_F = convert_gain_to_F (i + todo - 1);
             delta_F = (next_F - F) / (todo - 1);
           }
         for (uint j = 0; j < todo; j++)
@@ -406,19 +406,19 @@ class DistortionDSP
 
   bool filters_enabled = true;
 
-  SVF    pre_eq_filter;
+  int    sample_rate = 44100;
+
+  SVF                                       pre_eq_filter;
   ParamSmoother<SmootherType::logarithmic>  pre_eq_freq_smoother;
   ParamSmoother<SmootherType::logarithmic>  pre_eq_Q_inv_smoother;
   ParamSmoother<SmootherType::linear>       pre_eq_gain_smoother;
 
-  int    sample_rate = 44100;
 
-  SVF    post_lp_filter;
+  SVF                                       post_lp_filter;
+  ParamSmoother<SmootherType::logarithmic>  post_lp_freq_smoother;
 
-  ParamSmoother<SmootherType::logarithmic> post_lp_freq_smoother;
-
-  SVF    post_hp_filter;
-  float  post_hp_freq = 20;
+  SVF                                       post_hp_filter;
+  ParamSmoother<SmootherType::logarithmic>  post_hp_freq_smoother;
 
   StereoDelay<64> dry_delay;
 
@@ -459,11 +459,13 @@ public:
     pre_eq_gain_smoother.set_target (6, true);
 
     post_lp_freq_smoother.set_target (20000, true);
+    post_hp_freq_smoother.set_target (20, true);
   }
   void
   reset (int sample_rate)
   {
     pre_eq_filter.reset (sample_rate);
+
     post_lp_filter.reset (sample_rate);
     post_hp_filter.reset (sample_rate);
 
@@ -472,6 +474,7 @@ public:
     pre_eq_gain_smoother.reset (sample_rate, 0.025);
 
     post_lp_freq_smoother.reset (sample_rate, 0.025);
+    post_hp_freq_smoother.reset (sample_rate, 0.025);
 
     this->sample_rate = sample_rate;
     left_over_delay_history.fill (0);
@@ -491,9 +494,9 @@ public:
     post_lp_freq_smoother.set_target (lp_freq, now);
   }
   void
-  set_post_hp (float hp_freq)
+  set_post_hp (float hp_freq, bool now)
   {
-    post_hp_freq = hp_freq;
+    post_hp_freq_smoother.set_target (hp_freq, now);
   }
   void
   set_oversample (int new_oversample)
@@ -762,18 +765,20 @@ out:
     if (filters_enabled)
       {
         constexpr double BUTTERWORTH_Q = M_SQRT1_2; /* 1 / sqrt (2) */
-        constexpr float Q_inv = 1 / BUTTERWORTH_Q;
 
-        float freq_lp[n_samples];
-        float Q_inv_lp[n_samples];
+        float Q_inv_lp_hp[n_samples];
+        std::fill_n (Q_inv_lp_hp, n_samples, 1 / BUTTERWORTH_Q);
 
-        post_lp_freq_smoother.process_block (freq_lp, n_samples);
-        std::fill_n (Q_inv_lp, n_samples, Q_inv);
-        post_lp_filter.process_mod (SVF::LP, left_in, right_in, freq_lp, Q_inv_lp, /* unused */ freq_lp, n_samples);
+        float freq_lp_hp[n_samples];
+        post_lp_freq_smoother.process_block (freq_lp_hp, n_samples);
+        post_lp_filter.process_mod (SVF::LP, left_in, right_in, freq_lp_hp, Q_inv_lp_hp, nullptr, n_samples);
+
+        post_hp_freq_smoother.process_block (freq_lp_hp, n_samples);
+        post_hp_filter.process_mod (SVF::HP, left_in, right_in, freq_lp_hp, Q_inv_lp_hp, nullptr, n_samples);
         //post_lp_filter.set_params (SVF::LP, post_lp_freq, Q_inv, 0);
         //post_lp_filter.process_block (SVF::LP, left_in, right_in, n_samples);
-        post_hp_filter.set_params (SVF::HP, post_hp_freq, Q_inv, 0);
-        post_hp_filter.process_block (SVF::HP, left_in, right_in, n_samples);
+        //post_hp_filter.set_params (SVF::HP, post_hp_freq, Q_inv, 0);
+        //post_hp_filter.process_block (SVF::HP, left_in, right_in, n_samples);
       }
 
     for (int i = 0; i < n_samples; i++)
