@@ -14,7 +14,7 @@ class ParamSmoother
 public:
   ParamSmoother (float start_value)
   {
-    set_target (start_value);
+    set_target (start_value, true);
   }
 
   /**
