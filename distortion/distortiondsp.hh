@@ -2,6 +2,7 @@
 
 #include "pandaresampler.hh"
 #include "log2.hh"
+#include "paramsmoother.hh"
 
 using PandaResampler::Resampler2;
 
@@ -412,7 +413,8 @@ class DistortionDSP
   int    sample_rate = 44100;
 
   SVF    post_lp_filter;
-  float  post_lp_freq = 20000;
+
+  ParamSmoother<SmootherType::logarithmic> post_lp_freq_smoother;
 
   SVF    post_hp_filter;
   float  post_hp_freq = 20;
@@ -448,13 +450,20 @@ class DistortionDSP
       }
   }
 public:
+  DistortionDSP()
+  {
+    /* smoother defaults */
+    post_lp_freq_smoother.set_target (20000, true);
+  }
   void
   reset (int sample_rate)
   {
-    //pre_eq_filter.reset (Filter::Type::PEQ, sample_rate);
     pre_eq_filter.reset (sample_rate);
     post_lp_filter.reset (sample_rate);
     post_hp_filter.reset (sample_rate);
+
+    post_lp_freq_smoother.reset (sample_rate, 0.025);
+
     this->sample_rate = sample_rate;
     left_over_delay_history.fill (0);
     right_over_delay_history.fill (0);
@@ -468,9 +477,9 @@ public:
     pre_eq_Q = Q;
   }
   void
-  set_post_lp (float lp_freq)
+  set_post_lp (float lp_freq, bool now)
   {
-    post_lp_freq = lp_freq;
+    post_lp_freq_smoother.set_target (lp_freq, now);
   }
   void
   set_post_hp (float hp_freq)
@@ -737,9 +746,15 @@ out:
         constexpr double BUTTERWORTH_Q = M_SQRT1_2; /* 1 / sqrt (2) */
         constexpr float Q_inv = 1 / BUTTERWORTH_Q;
 
-        post_lp_filter.set_params (SVF::LP, post_lp_freq, Q_inv, 0);
+        float freq_lp[n_samples];
+        float Q_inv_lp[n_samples];
+
+        post_lp_freq_smoother.process_block (freq_lp, n_samples);
+        std::fill_n (Q_inv_lp, n_samples, Q_inv);
+        post_lp_filter.process_mod (SVF::LP, left_in, right_in, freq_lp, Q_inv_lp, /* unused */ freq_lp, n_samples);
+        //post_lp_filter.set_params (SVF::LP, post_lp_freq, Q_inv, 0);
+        //post_lp_filter.process_block (SVF::LP, left_in, right_in, n_samples);
         post_hp_filter.set_params (SVF::HP, post_hp_freq, Q_inv, 0);
-        post_lp_filter.process_block (SVF::LP, left_in, right_in, n_samples);
         post_hp_filter.process_block (SVF::HP, left_in, right_in, n_samples);
       }
 

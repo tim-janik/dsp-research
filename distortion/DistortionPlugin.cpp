@@ -90,7 +90,7 @@ public:
      distortion_dsp.set_symmetry (symmetry->get());
      distortion_dsp.set_mode (mode->getIndex());
      distortion_dsp.set_pre_eq_params (pre_eq_freq->get(), pre_eq_gain->get(), pre_eq_Q->get());
-     distortion_dsp.set_post_lp (post_lp_freq->get());
+     distortion_dsp.set_post_lp (post_lp_freq->get(), now);
      distortion_dsp.set_post_hp (post_hp_freq->get());
      distortion_dsp.set_mix (mix->get());
    }
