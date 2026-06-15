@@ -584,18 +584,25 @@ public:
 
     if (filters_enabled)
       {
-        float freq_peq[n_samples];
-        float Q_inv_peq[n_samples];
-        float gain_peq[n_samples];
+        if (pre_eq_freq_smoother.is_constant() && pre_eq_Q_inv_smoother.is_constant() && pre_eq_gain_smoother.is_constant())
+          {
+            /* FAST: no smoothing case */
+            pre_eq_filter.set_params (SVF::PEQ, pre_eq_freq_smoother.get_next(), pre_eq_Q_inv_smoother.get_next(), pre_eq_gain_smoother.get_next());
+            pre_eq_filter.process_block (SVF::PEQ, left_in, right_in, n_samples);
+          }
+        else
+          {
+            /* SLOW: at least one parameter is smoothing */
+            float freq_peq[n_samples];
+            float Q_inv_peq[n_samples];
+            float gain_peq[n_samples];
 
-        pre_eq_freq_smoother.process_block (freq_peq, n_samples);
-        pre_eq_Q_inv_smoother.process_block (Q_inv_peq, n_samples);
-        pre_eq_gain_smoother.process_block (gain_peq, n_samples);
+            pre_eq_freq_smoother.process_block (freq_peq, n_samples);
+            pre_eq_Q_inv_smoother.process_block (Q_inv_peq, n_samples);
+            pre_eq_gain_smoother.process_block (gain_peq, n_samples);
 
-        pre_eq_filter.process_mod (SVF::PEQ, left_in, right_in, freq_peq, Q_inv_peq, gain_peq, n_samples);
-        //float Q_inv = 1 / pre_eq_Q;
-        //pre_eq_filter.set_params (SVF::PEQ, pre_eq_freq, Q_inv, pre_eq_gain);
-        //pre_eq_filter.process_block (SVF::PEQ, left_in, right_in, n_samples);
+            pre_eq_filter.process_mod (SVF::PEQ, left_in, right_in, freq_peq, Q_inv_peq, gain_peq, n_samples);
+          }
       }
 
     float left_over_raw[over_delay + oversample * n_samples];
@@ -765,20 +772,43 @@ out:
     if (filters_enabled)
       {
         constexpr double BUTTERWORTH_Q = M_SQRT1_2; /* 1 / sqrt (2) */
+        constexpr float  BUTTERWORTH_Q_INV = 1 / BUTTERWORTH_Q;
 
         float Q_inv_lp_hp[n_samples];
-        std::fill_n (Q_inv_lp_hp, n_samples, 1 / BUTTERWORTH_Q);
+        if (!post_lp_freq_smoother.is_constant() || !post_hp_freq_smoother.is_constant())
+          {
+            std::fill_n (Q_inv_lp_hp, n_samples, BUTTERWORTH_Q_INV);
+          }
 
-        float freq_lp_hp[n_samples];
-        post_lp_freq_smoother.process_block (freq_lp_hp, n_samples);
-        post_lp_filter.process_mod (SVF::LP, left_in, right_in, freq_lp_hp, Q_inv_lp_hp, nullptr, n_samples);
+        if (post_lp_freq_smoother.is_constant())
+          {
+            /* FAST: no smoothing case */
+            post_lp_filter.set_params (SVF::LP, post_lp_freq_smoother.get_next(), BUTTERWORTH_Q_INV, 0);
+            post_lp_filter.process_block (SVF::LP, left_in, right_in, n_samples);
+          }
+        else
+          {
+            /* SLOW: with lowpass frequency smoothing */
+            float freq_lp[n_samples];
 
-        post_hp_freq_smoother.process_block (freq_lp_hp, n_samples);
-        post_hp_filter.process_mod (SVF::HP, left_in, right_in, freq_lp_hp, Q_inv_lp_hp, nullptr, n_samples);
-        //post_lp_filter.set_params (SVF::LP, post_lp_freq, Q_inv, 0);
-        //post_lp_filter.process_block (SVF::LP, left_in, right_in, n_samples);
-        //post_hp_filter.set_params (SVF::HP, post_hp_freq, Q_inv, 0);
-        //post_hp_filter.process_block (SVF::HP, left_in, right_in, n_samples);
+            post_lp_freq_smoother.process_block (freq_lp, n_samples);
+            post_lp_filter.process_mod (SVF::LP, left_in, right_in, freq_lp, Q_inv_lp_hp, nullptr, n_samples);
+          }
+
+        if (post_hp_freq_smoother.is_constant())
+          {
+            /* FAST: no smoothing case */
+            post_hp_filter.set_params (SVF::HP, post_hp_freq_smoother.get_next(), BUTTERWORTH_Q_INV, 0);
+            post_hp_filter.process_block (SVF::HP, left_in, right_in, n_samples);
+          }
+        else
+          {
+            /* SLOW: with highpass frequency smoothing */
+            float freq_hp[n_samples];
+
+            post_hp_freq_smoother.process_block (freq_hp, n_samples);
+            post_hp_filter.process_mod (SVF::HP, left_in, right_in, freq_hp, Q_inv_lp_hp, nullptr, n_samples);
+          }
       }
 
     for (int i = 0; i < n_samples; i++)

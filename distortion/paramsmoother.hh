@@ -100,6 +100,14 @@ public:
       }
     return current_;
   }
+  /**
+   * Check wether we're currently smoothing or if the output is a constant value
+   */
+  bool
+  is_constant()
+  {
+    return ramp_counter_ == 0;
+  }
 
   /**
    * Fills an entire buffer array block.

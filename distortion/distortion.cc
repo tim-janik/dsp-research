@@ -202,8 +202,10 @@ main (int argc, char **argv)
       distortion_dsp.set_symmetry (0);
       distortion_dsp.reset (48000);
 
-      for (bool filters : { false, true })
+      for (int p = 0; p < 3; p++)
         {
+          bool filters = p > 0;
+          bool mod = p == 2;
           distortion_dsp.enable_filters (filters);
           const int block_size = 512;
           float left[block_size], right[block_size];
@@ -216,13 +218,23 @@ main (int argc, char **argv)
           const int blocks = 50 * 1000;
           for (int b = 0; b < blocks; b++)
             {
+              if (mod)
+                {
+                  const float F[2] = { 440, 1000 };
+                  const float G[2] = { 6, 12 };
+                  const float Q[2] = { 1, 2 };
+
+                  distortion_dsp.set_pre_eq_params (F[b & 1], G[b & 1], Q[b & 1], false);
+                  distortion_dsp.set_post_lp (F[b & 1], false);
+                  distortion_dsp.set_post_hp (F[b & 1], false);
+                }
               distortion_dsp.process_block (left, right, block_size);
             }
 
           double end_t = get_time();
           double ns_per_sec = 1e9;
           double ns_per_sample = ns_per_sec * (end_t - start_t) / (blocks * block_size);
-          printf ("ns/sample %f %s filters\n", ns_per_sample, filters ? "with" : "without");
+          printf ("ns/sample %f %s filters, %s modulation\n", ns_per_sample, filters ? "with" : "without", mod ? "with" : "without");
           printf ("                    bogopolyphony = %f\n\n", 1e9 / (ns_per_sample * 48000));
         }
     }
