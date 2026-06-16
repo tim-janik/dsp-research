@@ -57,10 +57,22 @@ public:
             return std::log (value / start) / std::log (end / start);
           }
       );
+      auto Q_range = NormalisableRange<float>(
+        0.1f,
+        10.0f,
+        [](float start, float end, float proportion)
+          {
+            return start * std::pow (end / start, proportion);
+          },
+        [](float start, float end, float value)
+          {
+            return std::log (value / start) / std::log (end / start);
+          }
+      );
 
       addParameter (pre_eq_freq = new AudioParameterFloat ({ "pre_eq_freq", 1 }, "EQ Freq", freq_range, 1000.0f));
       addParameter (pre_eq_gain = new AudioParameterFloat ({ "pre_eq_gain", 1 }, "EQ Gain", -24.f, 24.f, 12.f));
-      addParameter (pre_eq_Q = new AudioParameterFloat ({"pre_eq_Q", 1 }, "EQ Q", 0.1f, 10.f, 1.f));
+      addParameter (pre_eq_Q = new AudioParameterFloat ({"pre_eq_Q", 1 }, "EQ Q", Q_range, 1.f));
       addParameter (post_hp_freq = new AudioParameterFloat ({"post_hp_freq", 1 }, "Post HP Freq", hp_freq_range, 80.f));
       addParameter (post_lp_freq = new AudioParameterFloat ({"post_lp_freq", 1 }, "Post LP Freq", lp_freq_range, 8000.f));
     }
