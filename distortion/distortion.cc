@@ -8,6 +8,8 @@
 #include <cmath>
 #include <iostream>
 
+using std::complex;
+
 static constexpr double PI = 3.14159265358979323846;
 
 class LatencyTester
@@ -124,7 +126,8 @@ get_time()
 
 float global_f = 0;
 
-double expect (SVF::Output output, double f, double freq, double Q, double gain_db)
+complex<double>
+expect (SVF::Output output, double f, double freq, double Q, double gain_db)
 {
   double A = pow (10, gain_db / 40);
 
@@ -139,11 +142,11 @@ double expect (SVF::Output output, double f, double freq, double Q, double gain_
 
   // bilinear mapping: s = j*Omega
   double Omega = 2.0 * fs * tan(w / 2.0);
-  std::complex<double> s(0.0, Omega);
+  complex<double> s(0.0, Omega);
 
   // scaled Butterworth prototype
   s /= Omega_c;
-  std::complex<double> H;
+  complex<double> H;
   switch (output)
     {
       case SVF::LP:     H = 1.0 / (s*s + s / Q + 1.0);
@@ -163,8 +166,21 @@ double expect (SVF::Output output, double f, double freq, double Q, double gain_
       default:          H = 0;
     }
 
-  return std::abs(H);
+  return H;
 }
+
+double
+unwrap (double phase, double prev)
+{
+  while (phase - prev > M_PI)
+    phase -= 2.0 * M_PI;
+
+  while (phase - prev < -M_PI)
+    phase += 2.0 * M_PI;
+
+  return phase;
+}
+
 int
 main (int argc, char **argv)
 {
@@ -289,17 +305,20 @@ main (int argc, char **argv)
           printf ("%f %.8f\n", in_freq[i], sqrt (buffer[i] * buffer[i] + buffer2[i] * buffer2[i]));
         }
     }
-  else if ((argc == 5 || argc == 6) && (strcmp (argv[1], "sweep-svf") == 0) || (strcmp (argv[1], "sweep-svf-mod") == 0))
+  else if ((argc == 5 || argc == 6) && (strcmp (argv[1], "sweep-svf") == 0 || strcmp (argv[1], "sweep-svf-mod") == 0))
     {
       int SR = 44100;
-      float buffer[5*SR], buffer2[5*SR], in_freq[5*SR];
+      float buffer[5*SR], buffer2[5*SR], in_freq[5*SR], in_phase[5*SR];
       double phase = 0;
+      double fade_samples = 250;
       for (int i = 0; i < 5*SR; i++)
         {
           double freq = 20*(pow (1000,(double (i)/44100/5)));
+          double fade_in = i < fade_samples ? i / fade_samples : 1.0;
           in_freq[i] = freq;
-          buffer[i] = sin (phase);
-          buffer2[i] = cos (phase);
+          in_phase[i] = phase;
+          buffer[i] = sin (phase) * fade_in;
+          buffer2[i] = cos (phase) * fade_in;
           phase += freq * 2 * M_PI / 44100;
         }
       SVF svf;
@@ -338,9 +357,37 @@ main (int argc, char **argv)
             }
           svf.process_mod (output, buffer, buffer2, freq, Q_inv_in, gain_in, 5 * SR);
         }
+      double prev_phase = 0;
+      float out_phase[5*SR];
       for (int i = 0; i < 5*SR; i++)
         {
-          printf ("%f %.8f %.8f\n", in_freq[i], sqrt (buffer[i] * buffer[i] + buffer2[i] * buffer2[i]), expect (output, in_freq[i], cutoff, Q, gain_db));
+          double S     = buffer[i];   // filtered sin sample
+          double C     = buffer2[i];  // filtered cos sample
+          double phase = unwrap (std::atan2 (S, C) - in_phase[i], prev_phase);
+
+          prev_phase = phase;
+          out_phase[i] = phase;
+        }
+      auto avg_phase = [&] {
+        double avg = 0;
+        for (int i = 0; i < 5*SR; i++)
+          avg += out_phase[i];
+        return avg / (5*SR);
+      };
+      while (avg_phase() > M_PI)
+        for (int i = 0; i < 5*SR; i++)
+          out_phase[i] -= 2 * M_PI;
+      while (avg_phase() < -M_PI)
+        for (int i = 0; i < 5*SR; i++)
+          out_phase[i] += 2 * M_PI;
+
+      for (int i = 2 * fade_samples; i < 5*SR; i++) /* skip first samples (filter fade in) */
+        {
+          double magnitude = std::sqrt (buffer[i] * buffer[i] + buffer2[i] * buffer2[i]);
+
+          complex<double> H = expect (output, in_freq[i], cutoff, Q, gain_db);
+
+          printf ("%f %.8f %.8f %.8f %.8f\n", in_freq[i], magnitude, std::abs (H), out_phase[i], std::arg (H));
         }
     }
   else if (argc == 2 && !strcmp (argv[1], "svf-perf"))
