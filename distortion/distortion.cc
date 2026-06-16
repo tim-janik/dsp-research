@@ -172,7 +172,7 @@ expect (SVF::Output output, double f, double freq, double Q, double gain_db)
 }
 
 double
-unwrap (double phase, double prev)
+unwrap_phase (double phase, double prev)
 {
   while (phase - prev > M_PI)
     phase -= 2.0 * M_PI;
@@ -365,7 +365,7 @@ main (int argc, char **argv)
         {
           double S     = buffer[i];   // filtered sin sample
           double C     = buffer2[i];  // filtered cos sample
-          double phase = unwrap (std::atan2 (S, C) - in_phase[i], prev_phase);
+          double phase = unwrap_phase (std::atan2 (S, C) - in_phase[i], prev_phase);
 
           prev_phase = phase;
           out_phase[i] = phase;
@@ -383,13 +383,16 @@ main (int argc, char **argv)
         for (int i = 0; i < 5*SR; i++)
           out_phase[i] += 2 * M_PI;
 
+      prev_phase = 0;
       for (int i = 2 * fade_samples; i < 5*SR; i++) /* skip first samples (filter fade in) */
         {
           double magnitude = std::sqrt (buffer[i] * buffer[i] + buffer2[i] * buffer2[i]);
 
           complex<double> H = expect (output, in_freq[i], cutoff, Q, gain_db);
+          double expect_phase = unwrap_phase (std::arg (H), prev_phase);
+          prev_phase = expect_phase;
 
-          printf ("%f %.8f %.8f %.8f %.8f\n", in_freq[i], magnitude, std::abs (H), out_phase[i], std::arg (H));
+          printf ("%f %.8f %.8f %.8f %.8f\n", in_freq[i], magnitude, std::abs (H), out_phase[i], expect_phase);
         }
     }
   else if (argc == 2 && !strcmp (argv[1], "svf-perf"))
