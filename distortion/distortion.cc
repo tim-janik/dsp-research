@@ -155,6 +155,8 @@ expect (SVF::Output output, double f, double freq, double Q, double gain_db)
                         break;
       case SVF::HP:     H = s * s / (s*s + s / Q + 1.0);
                         break;
+      case SVF::AP:     H = (s * s - s / Q + 1.0) /  (s*s + s / Q + 1.0);
+                        break;
       case SVF::PEQ:    H = (s * s + s * A / Q + 1.0) / (s * s + s / (A * Q) + 1.0);
                         break;
       case SVF::LSH:    H = A * (s * s + std::sqrt (A) / Q * s + A) / (A * s * s + sqrt (A) / Q * s + 1.0);

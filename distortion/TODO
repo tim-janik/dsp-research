@@ -1,6 +1,5 @@
 - pre-eq
 - post-filters
-- SVF all pass
 - smoothing
 - symmetry
 - slew

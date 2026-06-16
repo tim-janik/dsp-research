@@ -66,12 +66,13 @@ public:
     LP,
     BP,
     HP,
+    AP,
     PEQ,
     LSH,
     HSH,
     NOTCH
   };
-  static constexpr std::array<const char *, 7> output_name = { "lp", "bp", "hp", "peq", "lsh", "hsh", "notch" };
+  static constexpr std::array<const char *, 8> output_name = { "lp", "bp", "hp", "ap", "peq", "lsh", "hsh", "notch" };
   void
   reset (float sample_rate)
   {
@@ -83,12 +84,14 @@ public:
   void
   set_params (Output output, float cutoff, float Q_inv, float gain_db)
   {
-    if (output == LP || output == BP || output == HP || output == NOTCH)
+    if (output == LP || output == BP || output == HP || output == AP || output == NOTCH)
       {
         g = cutoff_warp (cutoff);
         set_params_g_Q_inv (Q_inv);
         if (output == BP)
           m_bp = Q_inv;
+        else if (output == AP)
+          m_bp = -Q_inv;
       }
     else if (output == PEQ)
       set_peq_params_A (cutoff, Q_inv, powf (10, gain_db / 40));
@@ -192,6 +195,8 @@ public:
 
                 if (output == BP)
                   m_bp = Q_inv;
+                if (output == AP)
+                  m_bp = -Q_inv;
               }
             process_s<output> (left + i + j, right + i + j);
           }
@@ -250,6 +255,11 @@ public:
         *l = hpl;
         *r = hpr;
       }
+    else if (output == AP)
+      {
+        *l = lpl + bpl * m_bp + hpl;
+        *r = lpr + bpr * m_bp + hpr;
+      }
     else if (output == PEQ)
       {
         *l = lpl + hpl + bpl * m_bp;
@@ -295,6 +305,8 @@ public:
                     break;
         case HP:    process_block<HP> (left, right, n_samples);
                     break;
+        case AP:    process_block<AP> (left, right, n_samples);
+                    break;
         case PEQ:   process_block<PEQ> (left, right, n_samples);
                     break;
         case LSH:   process_block<LSH> (left, right, n_samples);
@@ -316,6 +328,8 @@ public:
         case BP:    process_mod<BP> (left, right, freq_in, Q_inv_in, gain_db_in, n_frames);
                     break;
         case HP:    process_mod<HP> (left, right, freq_in, Q_inv_in, gain_db_in, n_frames);
+                    break;
+        case AP:    process_mod<AP> (left, right, freq_in, Q_inv_in, gain_db_in, n_frames);
                     break;
         case PEQ:   process_mod<PEQ> (left, right, freq_in, Q_inv_in, gain_db_in, n_frames);
                     break;
