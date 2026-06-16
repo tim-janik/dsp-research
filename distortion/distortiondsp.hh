@@ -626,8 +626,6 @@ public:
 
     if (mode == 5)
       {
-        static float table[1024 + 2];
-        static bool table_init = false;
         float left_pre_F[n_samples * oversample];
         float right_pre_F[n_samples * oversample];
         for (size_t i = 0; i < n_samples * oversample; i++)
@@ -641,26 +639,8 @@ public:
             right_pre_F[i] = cheap_tanh_antiderivative_approx (right[i]);
           }
 
-        if (!table_init) // XXX
-          {
-            for (int i = 0; i < 1024 + 2; i++)
-              {
-                double x = i * 20 / 1024. - 10.0;
-
-                table[i] = cheap_tanh_antiderivative (x);
-              }
-            table_init = true;
-          }
-
         for (size_t i = 0; i < n_samples * oversample; i++)
           {
-            auto F = [] (float x)
-              {
-                float f = ((x + 10) / 20 * 1024);
-                int i = f;
-                float frac = f - i;
-                return table[i] + (table[i + 1] - table[i]) * frac;
-              };
             auto adaa = [&] (float x, float last_x, float F, float last_F)
               {
                 /* ADAA quotient is (F - last_F) / (x - last_x)
