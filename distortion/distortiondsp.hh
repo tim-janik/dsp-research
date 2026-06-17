@@ -621,10 +621,12 @@ public:
     float *right = right_over;
 
     float drive_factor = exp10f (drive * (1/20.f));
+#if 0
     float s = std::clamp (symmetry * 0.01f, 0.f, 1.f) * 0.7f;;
     float neg_scale = (1-s)*(1-s);
+#endif
 
-    if (mode == 5)
+    if (mode == 0)
       {
         float left_pre_F[n_samples * oversample];
         float right_pre_F[n_samples * oversample];
@@ -679,6 +681,57 @@ public:
           }
         goto out;
       }
+    if (mode == 1)
+      {
+        for (size_t i = 0; i < n_samples * oversample; i++)
+          {
+            left[i] = std::sin (left[i] * drive_factor);
+            right[i] = std::sin (right[i] * drive_factor);
+          }
+      }
+    if (mode == 2)
+      {
+        for (size_t i = 0; i < n_samples * oversample; i++)
+          {
+            float l = left[i] * drive_factor;
+            float r = right[i] * drive_factor;
+
+            auto adaa = [&] (float x, float last_x, float F, float last_F)
+              {
+                /* ADAA quotient is (F - last_F) / (x - last_x)
+                 *
+                 * This is problematic if F and last_F are very close, because
+                 * then float cancellation will remove the significant bits, so
+                 * ADAA approximation will be inaccurate.
+                 *
+                 * We could do everything in double precision but this would
+                 * be slow.
+                 *
+                 * Insead, we use a rather high epsilon, because in real world
+                 * signals if x and last_x are very similar then the ADAA value
+                 * is close to the sin value anyway.
+                 */
+                const float epsilon = 0.001f;
+
+                float delta = x - last_x;
+                if (std::abs (delta) > epsilon)
+                  return (F - last_F) / delta;
+                else
+                  return std::sin (0.5f * (x + last_x));
+              };
+
+            float left_F = -std::cos (l);
+            left[i] = adaa (l, last_left, left_F, last_left_F);
+            last_left = l;
+            last_left_F = left_F;
+
+            float right_F = -std::cos (r);
+            right[i] = adaa (r, last_right, right_F, last_right_F);
+            last_right = r;
+            last_right_F = right_F;
+          }
+      }
+#if 0
     if (mode == 6)
       {
         for (size_t i = 0; i < n_samples * oversample; i++)
@@ -744,6 +797,7 @@ public:
             right[i] = r;
           }
       }
+#endif
 out:
     std::copy_n (left_over_delay_history.begin(), over_delay, left_over_raw);
     std::copy_n (right_over_delay_history.begin(), over_delay, right_over_raw);

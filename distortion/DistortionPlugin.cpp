@@ -16,7 +16,7 @@ public:
     {
       addParameter (drive = new AudioParameterFloat ({ "drive", 1 }, "Drive", -6.0f, 36.0f, 0.0f));
       addParameter (symmetry = new AudioParameterFloat ({ "symmetry", 1 }, "Symmetry", -100.0f, 100.0f, 0.0f));
-      addParameter (mode = new AudioParameterChoice ({ "mode", 1 }, "Distortion Mode", { "tanh", "sin", "hard", "tanh+over", "tanh+adaa", "cheaptanh+adaa" }, 0));
+      addParameter (mode = new AudioParameterChoice ({ "mode", 1 }, "Distortion Mode", { "cheaptanh+adaa", "sin", "sin+adaa" }, 0));
       addParameter (oversample_param = new AudioParameterChoice ({ "oversample", 1 }, "Oversample", { "1x", "2x", "4x", "8x" }, 0));
       addParameter (bias = new AudioParameterFloat ({ "bias", 1 }, "Bias", -0.5f, 0.5f, 0.0f));
       addParameter (mix = new AudioParameterFloat ({ "mix", 1 }, "Mix", 0.0f, 100.0f, 100.0f));
