@@ -28,12 +28,13 @@ public:
   float
   f (float x)
   {
-    if (x <= -RANGE)
+    float fbin = (x + float (RANGE)) * float (BINS / (RANGE * 2.0));
+
+    if (fbin < 0)
       return f_[0];
-    if (x >= RANGE)
+    if (fbin >= BINS)
       return f_[BINS];
 
-    float fbin = (x + float (RANGE)) * float (BINS / (RANGE * 2));
     int ibin = (int) fbin;
 
     float frac = fbin - ibin;
@@ -43,12 +44,13 @@ public:
   float
   F (float x)
   {
-    if (x <= -RANGE)
+    float fbin = (x + float (RANGE)) * float (BINS / (RANGE * 2.0));
+
+    if (fbin < 0)
       return F_[0] + (x + RANGE) * f_[0];
-    if (x >= RANGE)
+    if (fbin >= BINS)
       return F_[BINS] + (x - RANGE) * f_[BINS];
 
-    float fbin = (x + float (RANGE)) * float (BINS / (RANGE * 2));
     int ibin = (int) fbin;
 
     float frac = fbin - ibin;
