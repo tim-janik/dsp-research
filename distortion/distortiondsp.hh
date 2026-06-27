@@ -3,6 +3,7 @@
 #include "pandaresampler.hh"
 #include "log2.hh"
 #include "paramsmoother.hh"
+#include "adaatable.hh"
 
 using PandaResampler::Resampler2;
 
@@ -398,6 +399,37 @@ private:
 
 class DistortionDSP
 {
+  struct ADAATables
+  {
+    static constexpr int N_TABLES = 31; // odd to have the center table represent a linear function
+    std::array<std::unique_ptr<ADAATable<4, 1024>>, N_TABLES> tables;
+    ADAATables()
+    {
+      for (size_t i = 0; i < N_TABLES; i++)
+        {
+          auto distort_asymmetric = [&] (double x, double s)
+             {
+              double k  = s * 10;  // symmetry between -1 and 1 scales to k between -10 and 10
+              double kx = k * x;
+              if (std::abs (kx) < 0.001)
+                return x;
+              else
+                return (x / (1 - exp (-kx)) - 1./k)*2;
+            };
+          float symmetry = (i / (N_TABLES - 1.0)) * 2 - 1;
+          tables[i] = std::make_unique<ADAATable<4, 1024>> (
+            [&] (double x) { return distort_asymmetric (tanh (x), symmetry); }
+          );
+        }
+    }
+    static ADAATables& the()
+    {
+      static ADAATables instance;
+      return instance;
+    }
+  };
+  ADAATables& adaa_tables { ADAATables::the() };
+
   std::unique_ptr<Resampler2> up_left;
   std::unique_ptr<Resampler2> up_right;
   std::unique_ptr<Resampler2> down_left;
@@ -678,6 +710,18 @@ public:
             right[i] = adaa (r, last_right, right_F, last_right_F);
             last_right = r;
             last_right_F = right_F;
+
+            auto distort = [&] (float x, float s)
+              {
+                float k  = s * 10;  // symmetry between -1 and 1 scales to k between -10 and 10
+                float kx = k * x;
+                if (std::abs (kx) < 0.001f)
+                  return x;
+                else
+                  return (x / (1 - exp (-kx)) - 1.f/k)*2;
+              };
+            left[i] = distort (left[i], symmetry * 0.01f);
+            right[i] = distort (right[i], symmetry * 0.01f);
           }
         goto out;
       }
@@ -693,6 +737,11 @@ public:
       {
         for (size_t i = 0; i < n_samples * oversample; i++)
           {
+            // map symmetry [-100..100] to table index [0..N_TABLES - 1]
+            int TABLE = lrint ((symmetry * 0.01 + 1) / 2 * adaa_tables.N_TABLES);
+            TABLE = std::clamp (TABLE, 0, adaa_tables.N_TABLES - 1);
+
+            auto& table = *adaa_tables.tables[TABLE];
             float l = left[i] * drive_factor;
             float r = right[i] * drive_factor;
 
@@ -717,15 +766,15 @@ public:
                 if (std::abs (delta) > epsilon)
                   return (F - last_F) / delta;
                 else
-                  return std::sin (0.5f * (x + last_x));
+                  return table.f (0.5f * (x + last_x));
               };
 
-            float left_F = -std::cos (l);
+            float left_F = table.F (l);
             left[i] = adaa (l, last_left, left_F, last_left_F);
             last_left = l;
             last_left_F = left_F;
 
-            float right_F = -std::cos (r);
+            float right_F = table.F(r);
             right[i] = adaa (r, last_right, right_F, last_right_F);
             last_right = r;
             last_right_F = right_F;
