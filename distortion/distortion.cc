@@ -192,7 +192,7 @@ main (int argc, char **argv)
       distortion_dsp.set_mode (5);
       distortion_dsp.set_oversample (1);
       distortion_dsp.set_drive (0);
-      distortion_dsp.set_symmetry (0);
+      distortion_dsp.set_symmetry (0, true);
       distortion_dsp.set_pre_eq_params (1000, 0, 1, true);
       distortion_dsp.reset (44100);
       distortion_dsp.enable_filters (false);
@@ -214,10 +214,10 @@ main (int argc, char **argv)
   else if (argc == 2 && !strcmp (argv[1], "perf"))
     {
       DistortionDSP distortion_dsp;
-      distortion_dsp.set_mode (5);
+      distortion_dsp.set_mode (2);
       distortion_dsp.set_oversample (4);
       distortion_dsp.set_drive (6);
-      distortion_dsp.set_symmetry (0);
+      distortion_dsp.set_symmetry (0, true);
       distortion_dsp.reset (48000);
 
       for (int p = 0; p < 3; p++)
@@ -263,7 +263,7 @@ main (int argc, char **argv)
       distortion_dsp.set_mode (5);
       distortion_dsp.set_oversample (4);
       distortion_dsp.set_drive (-20);
-      distortion_dsp.set_symmetry (0);
+      distortion_dsp.set_symmetry (0, true);
       distortion_dsp.set_mix (100);
       distortion_dsp.set_pre_eq_params (1000, 12, 1, true);
       for (auto freq_hz : { 110.0, 220.0, 440.0, 880.0, 1000.0, 2000.0, 4000.0, 8000.0, 16000.0 })
@@ -289,10 +289,10 @@ main (int argc, char **argv)
           phase += freq * 2 * M_PI / 44100;
         }
       distortion_dsp.reset (SR);
-      distortion_dsp.set_mode (5);
+      distortion_dsp.set_mode (0);
       distortion_dsp.set_oversample (4);
       distortion_dsp.set_drive (0);
-      distortion_dsp.set_symmetry (0);
+      distortion_dsp.set_symmetry (0, true);
       distortion_dsp.set_pre_eq_params (1000, 12, 1, true);
       distortion_dsp.set_mix (mix);
       int i = 0;
@@ -469,6 +469,16 @@ main (int argc, char **argv)
           printf ("%f\n", buffer[i] * 0.1);
         }
     }
+  else if (argc == 2 && !strcmp (argv[1], "adaa-table"))
+    {
+      ADAATable<4, 3> table ([] (double x) { return tanh (x); });
+      for (double x = -5; x < 5; x += 0.001)
+        printf ("%f %f %f #f\n", x, table.f (x), tanh (x));
+      for (double x = -5; x < 5; x += 0.001)
+        printf ("%f %f %f #F\n", x, table.F (x), log (cosh (x)));
+      for (double x = -5; x < 5; x += 0.001)
+        printf ("%f %f %f #d\n", x, (table.F (x + 0.001) - table.F (x))/0.001, tanh (x));
+    }
   else
     {
       int SR = 44100;
@@ -482,10 +492,10 @@ main (int argc, char **argv)
           phase += freq * 2 * M_PI / 44100;
         }
       distortion_dsp.reset (SR);
-      distortion_dsp.set_mode (5);
+      distortion_dsp.set_mode (2);
       distortion_dsp.set_oversample (4);
       distortion_dsp.set_drive (36);
-      distortion_dsp.set_symmetry (0);
+      distortion_dsp.set_symmetry (100, true);
       distortion_dsp.enable_filters (false);
       distortion_dsp.set_mix (100);
       int i = 0;
@@ -496,6 +506,6 @@ main (int argc, char **argv)
           i += TODO;
         }
       for (int i = 0; i < 5*SR; i++)
-        printf ("%.8f\n", buffer[i] * 0.5);
+        printf ("%.8f\n", buffer[i] * 0.25);
     }
 }

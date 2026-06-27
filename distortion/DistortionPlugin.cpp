@@ -99,7 +99,7 @@ public:
        new_oversample = 8;
      distortion_dsp.set_oversample (new_oversample);
      distortion_dsp.set_drive (drive->get());
-     distortion_dsp.set_symmetry (symmetry->get());
+     distortion_dsp.set_symmetry (symmetry->get(), now);
      distortion_dsp.set_mode (mode->getIndex());
      distortion_dsp.set_pre_eq_params (pre_eq_freq->get(), pre_eq_gain->get(), pre_eq_Q->get(), now);
      distortion_dsp.set_post_lp (post_lp_freq->get(), now);

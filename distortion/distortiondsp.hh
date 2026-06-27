@@ -439,13 +439,14 @@ class DistortionDSP
   int oversample = -1;
   float drive = 0;
   float mix = 1;
-  float symmetry = 0;
   int mode = 0;
   int   last_table = -1;
   float last_left = 0;
   float last_right = 0;
-  float last_left_F = 0;
-  float last_right_F = 0;
+  float last_left_F_1 = 0;
+  float last_left_F_2 = 0;
+  float last_right_F_1 = 0;
+  float last_right_F_2 = 0;
 
   int over_delay = 0;
   std::array<float, MAX_OVERSAMPLE> left_over_delay_history {};
@@ -468,6 +469,8 @@ class DistortionDSP
   ParamSmoother<SmootherType::logarithmic>  post_hp_freq_smoother { 20 };
 
   StereoDelay<64> dry_delay;
+
+  ParamSmoother<SmootherType::linear>       symmetry_smoother     { 0 };
 
   // https://www.musicdsp.org/en/latest/Other/238-rational-tanh-approximation.html
   float
@@ -512,6 +515,8 @@ public:
 
     post_lp_freq_smoother.reset (sample_rate, 0.025);
     post_hp_freq_smoother.reset (sample_rate, 0.025);
+
+    symmetry_smoother.reset (sample_rate, 0.025);
 
     this->sample_rate = sample_rate;
     left_over_delay_history.fill (0);
@@ -585,9 +590,9 @@ public:
     drive = new_drive;
   }
   void
-  set_symmetry (float new_symmetry)
+  set_symmetry (float new_symmetry, bool now)
   {
-    symmetry = new_symmetry;
+    symmetry_smoother.set_target (new_symmetry, now);
   }
   void
   set_mode (int new_mode)
@@ -643,6 +648,9 @@ public:
             pre_eq_filter.process_mod (SVF::PEQ, left_in, right_in, freq_peq, Q_inv_peq, gain_peq, n_samples);
           }
       }
+
+    float symmetry[n_samples];
+    symmetry_smoother.process_block (symmetry, n_samples);
 
     float left_over_raw[over_delay + oversample * n_samples];
     float right_over_raw[over_delay + oversample * n_samples];
@@ -704,15 +712,15 @@ public:
 
             float l = left[i];
             float left_F = left_pre_F[i];
-            left[i] = adaa (l, last_left, left_F, last_left_F);
+            left[i] = adaa (l, last_left, left_F, last_left_F_1);
             last_left = l;
-            last_left_F = left_F;
+            last_left_F_1 = left_F;
 
             float r = right[i];
             float right_F = right_pre_F[i];
-            right[i] = adaa (r, last_right, right_F, last_right_F);
+            right[i] = adaa (r, last_right, right_F, last_right_F_1);
             last_right = r;
-            last_right_F = right_F;
+            last_right_F_1 = right_F;
 
             auto distort = [&] (float x, float s)
               {
@@ -723,8 +731,8 @@ public:
                 else
                   return (x / (1 - exp (-kx)) - 1.f/k)*2;
               };
-            left[i] = distort (left[i], symmetry * 0.01f);
-            right[i] = distort (right[i], symmetry * 0.01f);
+            left[i] = distort (left[i], symmetry[i / oversample] * 0.01f);
+            right[i] = distort (right[i], symmetry[i / oversample] * 0.01f);
           }
         goto out;
       }
@@ -741,14 +749,17 @@ public:
         for (size_t i = 0; i < n_samples * oversample; i++)
           {
             // map symmetry [-100..100] to table index [0..N_TABLES - 1]
-            int table_index = lrint ((symmetry * 0.01 + 1) / 2 * adaa_tables.N_TABLES);
-            table_index = std::clamp (table_index, 0, adaa_tables.N_TABLES - 1);
+            float ftable_index = (symmetry[i / oversample] * 0.01 + 1) / 2 * adaa_tables.N_TABLES;
+            int table_index = int (ftable_index);
+            table_index = std::clamp (table_index, 0, adaa_tables.N_TABLES - 2);
+            float frac = ftable_index - table_index;
 
-            auto& table = *adaa_tables.tables[table_index];
+            auto& table_1 = *adaa_tables.tables[table_index];
+            auto& table_2 = *adaa_tables.tables[table_index + 1];
             float l = left[i] * drive_factor;
             float r = right[i] * drive_factor;
 
-            auto adaa = [&] (float x, float last_x, float F, float last_F)
+            auto adaa = [&] (float x, float last_x, float F, float last_F, auto& table)
               {
                 /* ADAA quotient is (F - last_F) / (x - last_x)
                  *
@@ -774,19 +785,27 @@ public:
 
             if (last_table != table_index)
               {
-                last_left_F = table.F (last_left);
-                last_right_F = table.F (last_right);
+                last_left_F_1 = table_1.F (last_left);
+                last_right_F_1 = table_1.F (last_right);
+                last_left_F_2 = table_2.F (last_left);
+                last_right_F_2 = table_2.F (last_right);
                 last_table = table_index;
               }
-            float left_F = table.F (l);
-            left[i] = adaa (l, last_left, left_F, last_left_F);
+            float left_F_1 = table_1.F (l);
+            float left_F_2 = table_2.F (l);
+            left[i] = adaa (l, last_left, left_F_1, last_left_F_1, table_1) * (1 - frac) +
+                      adaa (l, last_left, left_F_2, last_left_F_2, table_2) * frac;
             last_left = l;
-            last_left_F = left_F;
+            last_left_F_1 = left_F_1;
+            last_left_F_2 = left_F_2;
 
-            float right_F = table.F(r);
-            right[i] = adaa (r, last_right, right_F, last_right_F);
+            float right_F_1 = table_1.F (r);
+            float right_F_2 = table_2.F (r);
+            right[i] = adaa (r, last_right, right_F_1, last_right_F_1, table_1) * (1 - frac) +
+                       adaa (r, last_right, right_F_2, last_right_F_2, table_2) * frac;
             last_right = r;
-            last_right_F = right_F;
+            last_right_F_1 = right_F_1;
+            last_right_F_2 = right_F_2;
           }
       }
 #if 0
