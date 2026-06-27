@@ -441,6 +441,7 @@ class DistortionDSP
   float mix = 1;
   float symmetry = 0;
   int mode = 0;
+  int   last_table = -1;
   float last_left = 0;
   float last_right = 0;
   float last_left_F = 0;
@@ -516,6 +517,8 @@ public:
     left_over_delay_history.fill (0);
     right_over_delay_history.fill (0);
     dry_delay.reset();
+
+    last_table = -1;
   }
   void
   set_pre_eq_params (float freq, float gain, float Q, bool now)
@@ -738,10 +741,10 @@ public:
         for (size_t i = 0; i < n_samples * oversample; i++)
           {
             // map symmetry [-100..100] to table index [0..N_TABLES - 1]
-            int TABLE = lrint ((symmetry * 0.01 + 1) / 2 * adaa_tables.N_TABLES);
-            TABLE = std::clamp (TABLE, 0, adaa_tables.N_TABLES - 1);
+            int table_index = lrint ((symmetry * 0.01 + 1) / 2 * adaa_tables.N_TABLES);
+            table_index = std::clamp (table_index, 0, adaa_tables.N_TABLES - 1);
 
-            auto& table = *adaa_tables.tables[TABLE];
+            auto& table = *adaa_tables.tables[table_index];
             float l = left[i] * drive_factor;
             float r = right[i] * drive_factor;
 
@@ -769,6 +772,12 @@ public:
                   return table.f (0.5f * (x + last_x));
               };
 
+            if (last_table != table_index)
+              {
+                last_left_F = table.F (last_left);
+                last_right_F = table.F (last_right);
+                last_table = table_index;
+              }
             float left_F = table.F (l);
             left[i] = adaa (l, last_left, left_F, last_left_F);
             last_left = l;
