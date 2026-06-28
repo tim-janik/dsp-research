@@ -749,9 +749,10 @@ public:
         for (size_t i = 0; i < n_samples * oversample; i++)
           {
             // map symmetry [-100..100] to table index [0..N_TABLES - 1]
-            float ftable_index = (symmetry[i / oversample] * 0.01 + 1) / 2 * adaa_tables.N_TABLES;
+            float ftable_index = (symmetry[i / oversample] * 0.01f + 1) / 2 * (adaa_tables.N_TABLES - 1);
+            ftable_index = std::max (0.f, ftable_index);
             int table_index = int (ftable_index);
-            table_index = std::clamp (table_index, 0, adaa_tables.N_TABLES - 2);
+            table_index = std::min (table_index, adaa_tables.N_TABLES - 2);
             float frac = ftable_index - table_index;
 
             auto& table_1 = *adaa_tables.tables[table_index];
