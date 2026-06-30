@@ -747,7 +747,6 @@ public:
             left[i] = distort (left[i], symmetry[i / oversample] * 0.01f);
             right[i] = distort (right[i], symmetry[i / oversample] * 0.01f);
           }
-        goto out;
       }
     if (mode == 1)
       {
