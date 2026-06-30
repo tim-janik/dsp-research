@@ -649,9 +649,6 @@ public:
           }
       }
 
-    float symmetry[n_samples];
-    symmetry_smoother.process_block (symmetry, n_samples);
-
     float left_over_raw[over_delay + oversample * n_samples];
     float right_over_raw[over_delay + oversample * n_samples];
     float *left_over = left_over_raw + over_delay;
@@ -664,13 +661,12 @@ public:
     float *right = right_over;
 
     float drive_factor = exp10f (drive * (1/20.f));
-#if 0
-    float s = std::clamp (symmetry * 0.01f, 0.f, 1.f) * 0.7f;;
-    float neg_scale = (1-s)*(1-s);
-#endif
 
     if (mode == 0)
       {
+        float symmetry[n_samples];
+        symmetry_smoother.process_block (symmetry, n_samples);
+
         float left_pre_F[n_samples * oversample];
         float right_pre_F[n_samples * oversample];
         for (size_t i = 0; i < n_samples * oversample; i++)
@@ -746,67 +742,14 @@ public:
       }
     if (mode == 2)
       {
-        for (size_t i = 0; i < n_samples * oversample; i++)
+        if (symmetry_smoother.is_constant())
           {
-            // map symmetry [-100..100] to table index [0..N_TABLES - 1]
-            float ftable_index = (symmetry[i / oversample] * 0.01f + 1) / 2 * (adaa_tables.N_TABLES - 1);
-            ftable_index = std::max (0.f, ftable_index);
-            int table_index = int (ftable_index);
-            table_index = std::min (table_index, adaa_tables.N_TABLES - 2);
-            float frac = ftable_index - table_index;
-
-            auto& table_1 = *adaa_tables.tables[table_index];
-            auto& table_2 = *adaa_tables.tables[table_index + 1];
-            float l = left[i] * drive_factor;
-            float r = right[i] * drive_factor;
-
-            auto adaa = [&] (float x, float last_x, float F, float last_F, auto& table)
-              {
-                /* ADAA quotient is (F - last_F) / (x - last_x)
-                 *
-                 * This is problematic if F and last_F are very close, because
-                 * then float cancellation will remove the significant bits, so
-                 * ADAA approximation will be inaccurate.
-                 *
-                 * We could do everything in double precision but this would
-                 * be slow.
-                 *
-                 * Insead, we use a rather high epsilon, because in real world
-                 * signals if x and last_x are very similar then the ADAA value
-                 * is close to the sin value anyway.
-                 */
-                const float epsilon = 0.001f;
-
-                float delta = x - last_x;
-                if (std::abs (delta) > epsilon)
-                  return (F - last_F) / delta;
-                else
-                  return table.f (0.5f * (x + last_x));
-              };
-
-            if (last_table != table_index)
-              {
-                last_left_F_1 = table_1.F (last_left);
-                last_right_F_1 = table_1.F (last_right);
-                last_left_F_2 = table_2.F (last_left);
-                last_right_F_2 = table_2.F (last_right);
-                last_table = table_index;
-              }
-            float left_F_1 = table_1.F (l);
-            float left_F_2 = table_2.F (l);
-            left[i] = adaa (l, last_left, left_F_1, last_left_F_1, table_1) * (1 - frac) +
-                      adaa (l, last_left, left_F_2, last_left_F_2, table_2) * frac;
-            last_left = l;
-            last_left_F_1 = left_F_1;
-            last_left_F_2 = left_F_2;
-
-            float right_F_1 = table_1.F (r);
-            float right_F_2 = table_2.F (r);
-            right[i] = adaa (r, last_right, right_F_1, last_right_F_1, table_1) * (1 - frac) +
-                       adaa (r, last_right, right_F_2, last_right_F_2, table_2) * frac;
-            last_right = r;
-            last_right_F_1 = right_F_1;
-            last_right_F_2 = right_F_2;
+            process_with_symmetry (left, right, n_samples * oversample, symmetry_smoother.get_next(), drive_factor);
+          }
+        else
+          {
+            for (size_t i = 0; i < n_samples * oversample; i += oversample)
+              process_with_symmetry (left + i, right + i, oversample, symmetry_smoother.get_next(), drive_factor);
           }
       }
 #if 0
@@ -931,6 +874,74 @@ out:
       {
         left_in[i] = dry_delay_left[i] + mix * (left_in[i] - dry_delay_left[i]);
         right_in[i] = dry_delay_right[i] + mix * (right_in[i] - dry_delay_right[i]);
+      }
+  }
+
+  void
+  process_with_symmetry (float *left, float *right, int n_samples, float symmetry, float drive_factor)
+  {
+    // map symmetry [-100..100] to table index [0..N_TABLES - 1]
+    float ftable_index = (symmetry * 0.01f + 1) / 2 * (adaa_tables.N_TABLES - 1);
+    ftable_index = std::max (0.f, ftable_index);
+    int table_index = int (ftable_index);
+    table_index = std::min (table_index, adaa_tables.N_TABLES - 2);
+    float frac = ftable_index - table_index;
+
+    auto& table_1 = *adaa_tables.tables[table_index];
+    auto& table_2 = *adaa_tables.tables[table_index + 1];
+
+    if (last_table != table_index)
+      {
+        last_left_F_1 = table_1.F (last_left);
+        last_right_F_1 = table_1.F (last_right);
+        last_left_F_2 = table_2.F (last_left);
+        last_right_F_2 = table_2.F (last_right);
+        last_table = table_index;
+      }
+    for (int i = 0; i < n_samples; i++)
+      {
+        float l = left[i] * drive_factor;
+        float r = right[i] * drive_factor;
+
+        auto adaa = [&] (float x, float last_x, float F, float last_F, auto& table)
+          {
+            /* ADAA quotient is (F - last_F) / (x - last_x)
+             *
+             * This is problematic if F and last_F are very close, because
+             * then float cancellation will remove the significant bits, so
+             * ADAA approximation will be inaccurate.
+             *
+             * We could do everything in double precision but this would
+             * be slow.
+             *
+             * Insead, we use a rather high epsilon, because in real world
+             * signals if x and last_x are very similar then the ADAA value
+             * is close to the sin value anyway.
+             */
+            const float epsilon = 0.001f;
+
+            float delta = x - last_x;
+            if (std::abs (delta) > epsilon)
+              return (F - last_F) / delta;
+            else
+              return table.f (0.5f * (x + last_x));
+          };
+
+        float left_F_1 = table_1.F (l);
+        float left_F_2 = table_2.F (l);
+        left[i] = adaa (l, last_left, left_F_1, last_left_F_1, table_1) * (1 - frac) +
+                  adaa (l, last_left, left_F_2, last_left_F_2, table_2) * frac;
+        last_left = l;
+        last_left_F_1 = left_F_1;
+        last_left_F_2 = left_F_2;
+
+        float right_F_1 = table_1.F (r);
+        float right_F_2 = table_2.F (r);
+        right[i] = adaa (r, last_right, right_F_1, last_right_F_1, table_1) * (1 - frac) +
+                   adaa (r, last_right, right_F_2, last_right_F_2, table_2) * frac;
+        last_right = r;
+        last_right_F_1 = right_F_1;
+        last_right_F_2 = right_F_2;
       }
   }
 };

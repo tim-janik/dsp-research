@@ -241,10 +241,12 @@ main (int argc, char **argv)
                   const float F[2] = { 440, 1000 };
                   const float G[2] = { 6, 12 };
                   const float Q[2] = { 1, 2 };
+                  const float SYM[2] = { -50, 100 };
 
                   distortion_dsp.set_pre_eq_params (F[b & 1], G[b & 1], Q[b & 1], false);
                   distortion_dsp.set_post_lp (F[b & 1], false);
                   distortion_dsp.set_post_hp (F[b & 1], false);
+                  distortion_dsp.set_symmetry (SYM[b & 1], false);
                 }
               distortion_dsp.process_block (left, right, block_size);
             }
