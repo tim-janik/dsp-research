@@ -191,7 +191,7 @@ main (int argc, char **argv)
       DistortionDSP distortion_dsp;
       distortion_dsp.set_mode (5);
       distortion_dsp.set_oversample (1);
-      distortion_dsp.set_drive (0);
+      distortion_dsp.set_drive (0, true);
       distortion_dsp.set_symmetry (0, true);
       distortion_dsp.set_pre_eq_params (1000, 0, 1, true);
       distortion_dsp.reset (44100);
@@ -216,7 +216,7 @@ main (int argc, char **argv)
       DistortionDSP distortion_dsp;
       distortion_dsp.set_mode (2);
       distortion_dsp.set_oversample (4);
-      distortion_dsp.set_drive (6);
+      distortion_dsp.set_drive (6, true);
       distortion_dsp.set_symmetry (0, true);
       distortion_dsp.reset (48000);
 
@@ -264,7 +264,7 @@ main (int argc, char **argv)
       distortion_dsp.reset (44100);
       distortion_dsp.set_mode (5);
       distortion_dsp.set_oversample (4);
-      distortion_dsp.set_drive (-20);
+      distortion_dsp.set_drive (-20, true);
       distortion_dsp.set_symmetry (0, true);
       distortion_dsp.set_mix (100);
       distortion_dsp.set_pre_eq_params (1000, 12, 1, true);
@@ -293,7 +293,7 @@ main (int argc, char **argv)
       distortion_dsp.reset (SR);
       distortion_dsp.set_mode (0);
       distortion_dsp.set_oversample (4);
-      distortion_dsp.set_drive (0);
+      distortion_dsp.set_drive (0, true);
       distortion_dsp.set_symmetry (0, true);
       distortion_dsp.set_pre_eq_params (1000, 12, 1, true);
       distortion_dsp.set_mix (mix);
@@ -496,7 +496,7 @@ main (int argc, char **argv)
       distortion_dsp.reset (SR);
       distortion_dsp.set_mode (2);
       distortion_dsp.set_oversample (4);
-      distortion_dsp.set_drive (36);
+      distortion_dsp.set_drive (36, true);
       distortion_dsp.set_symmetry (100, true);
       distortion_dsp.enable_filters (false);
       distortion_dsp.set_mix (100);

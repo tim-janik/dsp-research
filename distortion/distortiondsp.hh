@@ -437,7 +437,6 @@ class DistortionDSP
 
   static constexpr int MAX_OVERSAMPLE = 8;
   int oversample = -1;
-  float drive = 0;
   float mix = 1;
   int mode = 0;
   int   last_table = -1;
@@ -471,6 +470,7 @@ class DistortionDSP
   StereoDelay<64> dry_delay;
 
   ParamSmoother<SmootherType::linear>       symmetry_smoother     { 0 };
+  ParamSmoother<SmootherType::logarithmic>  drive_factor_smoother { 1 };
 
   // https://www.musicdsp.org/en/latest/Other/238-rational-tanh-approximation.html
   float
@@ -585,9 +585,9 @@ public:
       }
   }
   void
-  set_drive (float new_drive)
+  set_drive (float drive, bool now)
   {
-    drive = new_drive;
+    drive_factor_smoother.set_target (exp10f (drive * (1/20.f)), now);
   }
   void
   set_symmetry (float new_symmetry, bool now)
@@ -649,6 +649,25 @@ public:
           }
       }
 
+    if (drive_factor_smoother.is_constant())
+      {
+        float drive_factor = drive_factor_smoother.get_next();
+        for (int i = 0; i < n_samples; i++)
+          {
+            left_in[i] *= drive_factor;
+            right_in[i] *= drive_factor;
+          }
+      }
+    else
+      {
+        for (int i = 0; i < n_samples; i++)
+          {
+            float drive_factor = drive_factor_smoother.get_next();
+            left_in[i] *= drive_factor;
+            right_in[i] *= drive_factor;
+          }
+      }
+
     float left_over_raw[over_delay + oversample * n_samples];
     float right_over_raw[over_delay + oversample * n_samples];
     float *left_over = left_over_raw + over_delay;
@@ -660,8 +679,6 @@ public:
     float *left = left_over;
     float *right = right_over;
 
-    float drive_factor = exp10f (drive * (1/20.f));
-
     if (mode == 0)
       {
         float symmetry[n_samples];
@@ -671,8 +688,8 @@ public:
         float right_pre_F[n_samples * oversample];
         for (size_t i = 0; i < n_samples * oversample; i++)
           {
-            left[i] = std::clamp (left[i] * drive_factor, -10.f, 10.f);
-            right[i] = std::clamp (right[i] * drive_factor, -10.f, 10.f);
+            left[i] = std::clamp (left[i], -10.f, 10.f);
+            right[i] = std::clamp (right[i], -10.f, 10.f);
           }
         for (size_t i = 0; i < n_samples * oversample; i++)
           {
@@ -736,20 +753,20 @@ public:
       {
         for (size_t i = 0; i < n_samples * oversample; i++)
           {
-            left[i] = std::sin (left[i] * drive_factor);
-            right[i] = std::sin (right[i] * drive_factor);
+            left[i] = std::sin (left[i]);
+            right[i] = std::sin (right[i]);
           }
       }
     if (mode == 2)
       {
         if (symmetry_smoother.is_constant())
           {
-            process_with_symmetry (left, right, n_samples * oversample, symmetry_smoother.get_next(), drive_factor);
+            process_with_symmetry (left, right, n_samples * oversample, symmetry_smoother.get_next());
           }
         else
           {
             for (size_t i = 0; i < n_samples * oversample; i += oversample)
-              process_with_symmetry (left + i, right + i, oversample, symmetry_smoother.get_next(), drive_factor);
+              process_with_symmetry (left + i, right + i, oversample, symmetry_smoother.get_next());
           }
       }
 #if 0
@@ -878,7 +895,7 @@ out:
   }
 
   void
-  process_with_symmetry (float *left, float *right, int n_samples, float symmetry, float drive_factor)
+  process_with_symmetry (float *left, float *right, int n_samples, float symmetry)
   {
     // map symmetry [-100..100] to table index [0..N_TABLES - 1]
     float ftable_index = (symmetry * 0.01f + 1) / 2 * (adaa_tables.N_TABLES - 1);
@@ -900,8 +917,8 @@ out:
       }
     for (int i = 0; i < n_samples; i++)
       {
-        float l = left[i] * drive_factor;
-        float r = right[i] * drive_factor;
+        float l = left[i];
+        float r = right[i];
 
         auto adaa = [&] (float x, float last_x, float F, float last_F, auto& table)
           {
