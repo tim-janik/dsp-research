@@ -769,74 +769,7 @@ public:
               process_with_symmetry (left + i, right + i, oversample, symmetry_smoother.get_next());
           }
       }
-#if 0
-    if (mode == 6)
-      {
-        for (size_t i = 0; i < n_samples * oversample; i++)
-          {
-            left[i]  = cheap_tanh (drive_factor * left[i]);
-            right[i] = cheap_tanh (drive_factor * right[i]);
-          }
-        goto out;
-      }
-    for (size_t i = 0; i < n_samples * oversample; i++)
-      {
-        if (mode == 0)
-          {
-            left[i] = left[i]>0?tanh (drive_factor * left[i]):tanh(drive_factor * left[i] / neg_scale) * neg_scale;
-            right[i] = right[i]>0?tanh (drive_factor * right[i]):tanh(drive_factor * right[i] / neg_scale) * neg_scale;
-          }
-        else if (mode == 1)
-          {
-            left[i] = tanh(drive_factor * left[i]) / (1-s*tanh(drive_factor * left[i]))*(1-s);
-            right[i] = tanh(drive_factor * right[i]) / (1-s*tanh(drive_factor * right[i]))*(1-s);
-          }
-        else if (mode == 2)
-          {
-            float bias = std::clamp (symmetry * 0.01f, -1.f, 1.f) * 0.5f;
-            auto deriv = [] (float bias) { return (tanh(bias+0.001)-tanh(bias))/0.001; };
-            float norm = 1/deriv (bias);
-            left[i] = (tanh(drive_factor * left[i] + bias) - tanh (bias)) * norm;
-            right[i] = (tanh(drive_factor * right[i] + bias) - tanh (bias)) * norm;
-          }
-        else if (mode == 3)
-          {
-            float sl = 0;
-            float sr = 0;
-            for (int j = 0; j < 10; j++)
-              {
-                float frac = j / 10.;
 
-                sl += tanh ((last_left * (1 - frac) + left[i] * frac) * drive_factor);
-                sr += tanh ((last_right * (1 - frac) + right[i] * frac) * drive_factor);
-              }
-            last_right = right[i];
-            last_left = left[i];
-
-            left[i] = sl * 0.1f;
-            right[i] = sr * 0.1f;
-          }
-        else if (mode == 4)
-          {
-            auto F = [] (double x) { return log(cosh(x)); };
-            auto adaa = [&] (double x, double last_x) { 
-              x = std::clamp (x, -10., 10.);
-              last_x = std::clamp (last_x, -10., 10.);
-              if (fabs (x - last_x) > 0.00001)
-                return (F(x) - F(last_x)) / (x - last_x);
-              else
-                return tanh(x);
-            };
-            float l = adaa (left[i] * drive_factor, last_left * drive_factor);
-            float r = adaa (right[i] * drive_factor, last_right * drive_factor);
-            last_left = left[i];
-            last_right = right[i];
-            left[i] = l;
-            right[i] = r;
-          }
-      }
-#endif
-out:
     std::copy_n (left_over_delay_history.begin(), over_delay, left_over_raw);
     std::copy_n (right_over_delay_history.begin(), over_delay, right_over_raw);
     std::copy_n (&left[n_samples * oversample - over_delay], over_delay, left_over_delay_history.begin());
