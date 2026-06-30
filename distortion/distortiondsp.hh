@@ -437,7 +437,6 @@ class DistortionDSP
 
   static constexpr int MAX_OVERSAMPLE = 8;
   int oversample = -1;
-  float mix = 1;
   int mode = 0;
   int   last_table = -1;
   float last_left = 0;
@@ -471,6 +470,7 @@ class DistortionDSP
 
   ParamSmoother<SmootherType::linear>       symmetry_smoother     { 0 };
   ParamSmoother<SmootherType::logarithmic>  drive_factor_smoother { 1 };
+  ParamSmoother<SmootherType::linear>       mix_smoother          { 1 };
 
   // https://www.musicdsp.org/en/latest/Other/238-rational-tanh-approximation.html
   float
@@ -600,9 +600,9 @@ public:
     mode = new_mode;
   }
   void
-  set_mix (float percent)
+  set_mix (float percent, bool now)
   {
-    mix = std::clamp (percent * 0.01, 0.0, 1.0);
+    mix_smoother.set_target (std::clamp (percent * 0.01, 0.0, 1.0), now);
   }
   void
   enable_filters (bool enable)
@@ -887,10 +887,25 @@ out:
           }
       }
 
-    for (int i = 0; i < n_samples; i++)
+    if (mix_smoother.is_constant())
       {
-        left_in[i] = dry_delay_left[i] + mix * (left_in[i] - dry_delay_left[i]);
-        right_in[i] = dry_delay_right[i] + mix * (right_in[i] - dry_delay_right[i]);
+        float mix = mix_smoother.get_next();
+
+        for (int i = 0; i < n_samples; i++)
+          {
+            left_in[i] = dry_delay_left[i] + mix * (left_in[i] - dry_delay_left[i]);
+            right_in[i] = dry_delay_right[i] + mix * (right_in[i] - dry_delay_right[i]);
+          }
+      }
+    else
+      {
+        for (int i = 0; i < n_samples; i++)
+          {
+            float mix = mix_smoother.get_next();
+
+            left_in[i] = dry_delay_left[i] + mix * (left_in[i] - dry_delay_left[i]);
+            right_in[i] = dry_delay_right[i] + mix * (right_in[i] - dry_delay_right[i]);
+          }
       }
   }
 

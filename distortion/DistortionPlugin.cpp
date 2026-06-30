@@ -104,7 +104,7 @@ public:
      distortion_dsp.set_pre_eq_params (pre_eq_freq->get(), pre_eq_gain->get(), pre_eq_Q->get(), now);
      distortion_dsp.set_post_lp (post_lp_freq->get(), now);
      distortion_dsp.set_post_hp (post_hp_freq->get(), now);
-     distortion_dsp.set_mix (mix->get());
+     distortion_dsp.set_mix (mix->get(), now);
    }
 
     void processBlock (AudioBuffer<float>& buffer, MidiBuffer&) override

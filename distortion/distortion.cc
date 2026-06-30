@@ -266,7 +266,7 @@ main (int argc, char **argv)
       distortion_dsp.set_oversample (4);
       distortion_dsp.set_drive (-20, true);
       distortion_dsp.set_symmetry (0, true);
-      distortion_dsp.set_mix (100);
+      distortion_dsp.set_mix (100, true);
       distortion_dsp.set_pre_eq_params (1000, 12, 1, true);
       for (auto freq_hz : { 110.0, 220.0, 440.0, 880.0, 1000.0, 2000.0, 4000.0, 8000.0, 16000.0 })
         {
@@ -296,7 +296,7 @@ main (int argc, char **argv)
       distortion_dsp.set_drive (0, true);
       distortion_dsp.set_symmetry (0, true);
       distortion_dsp.set_pre_eq_params (1000, 12, 1, true);
-      distortion_dsp.set_mix (mix);
+      distortion_dsp.set_mix (mix, true);
       int i = 0;
       while (i < 5 * SR)
         {
@@ -499,7 +499,7 @@ main (int argc, char **argv)
       distortion_dsp.set_drive (36, true);
       distortion_dsp.set_symmetry (100, true);
       distortion_dsp.enable_filters (false);
-      distortion_dsp.set_mix (100);
+      distortion_dsp.set_mix (100, true);
       int i = 0;
       while (i < 5 * SR)
         {
