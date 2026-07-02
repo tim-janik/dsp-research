@@ -445,6 +445,8 @@ class DistortionDSP
   float last_left_F_2 = 0;
   float last_right_F_1 = 0;
   float last_right_F_2 = 0;
+  float left_history = 0;
+  float right_history = 0;
 
   int over_delay = 0;
   std::array<float, MAX_OVERSAMPLE> left_over_delay_history {};
@@ -471,6 +473,12 @@ class DistortionDSP
   ParamSmoother<SmootherType::linear>       symmetry_smoother     { 0 };
   ParamSmoother<SmootherType::logarithmic>  drive_factor_smoother { 1 };
   ParamSmoother<SmootherType::linear>       mix_smoother          { 1 };
+
+  float                                     slew_time = 1e-6;
+  float                                     slew_p = 100;
+  float                                     slew_last_l = 0;
+  float                                     slew_last_r = 0;
+  float                                     prev_target = 0;
 
   // https://www.musicdsp.org/en/latest/Other/238-rational-tanh-approximation.html
   float
@@ -603,6 +611,14 @@ public:
   set_mix (float percent, bool now)
   {
     mix_smoother.set_target (std::clamp (percent * 0.01, 0.0, 1.0), now);
+  }
+  void
+  set_slew (float slew)
+  {
+    float min_time = 1 / 48000.;
+    float max_time = 0.200;
+    slew_time = min_time * powf (max_time / min_time, slew * 0.01f);
+    slew_p = slew;
   }
   void
   enable_filters (bool enable)
@@ -756,7 +772,7 @@ public:
             right[i] = std::sin (right[i]);
           }
       }
-    if (mode == 2)
+    if (mode == 2 || mode == 3 || mode == 4 || mode == 5 || mode == 6)
       {
         if (symmetry_smoother.is_constant())
           {
@@ -766,6 +782,99 @@ public:
           {
             for (size_t i = 0; i < n_samples * oversample; i += oversample)
               process_with_symmetry (left + i, right + i, oversample, symmetry_smoother.get_next());
+          }
+      }
+    float slew_delta = 2.0 / (slew_time * sample_rate * oversample);
+    for (size_t i = 0; i < n_samples * oversample; i++)
+      {
+        float alpha = expf(-2.0f * M_PI * 20000 / (oversample * sample_rate));
+        if (mode == 6)
+          {
+            float y = slew_last_l;
+            float out;
+            float slew_delta_signed = prev_target > slew_last_l ? slew_delta : -slew_delta;
+            float t = (slew_last_l - prev_target) / (left[i] - slew_last_l - slew_delta_signed);
+            if (t > 0 && t < 1)
+              {
+                float y0 = slew_last_l;
+                float yt = y0 + t * slew_delta_signed;
+                y = std::clamp (left[i], yt + (1 - t) * -slew_delta, yt + (1 - t) * slew_delta);
+
+                float area1 = (y0 + yt) * t * 0.5f;
+                float area2 = (yt + y) * (1 - t) * 0.5f;
+                out = area1 + area2;
+              }
+            else
+              {
+                y = std::clamp (left[i], slew_last_l - slew_delta, slew_last_l + slew_delta);
+                out = (slew_last_l + y) * 0.5f;
+              }
+            prev_target = left[i];
+            left[i] = out;
+            slew_last_l = y;
+          }
+        if (mode == 5)
+          {
+            int sub_steps = 64;
+            float y = slew_last_l;
+            float sub_slew_delta = slew_delta / sub_steps;
+            for (int s = 0; s < sub_steps; s++)
+              {
+                // Linear interpolation of target within this sample period
+                float t = (s + 0.5f) / sub_steps;           // or s / sub_steps, experiment
+                float target = prev_target * (1.0f - t) + left[i] * t;
+
+                float delta = target - y;
+                y += std::clamp (delta, -sub_slew_delta, sub_slew_delta);
+              }
+            prev_target = left[i];
+            left[i] = y;
+
+            slew_last_l = left[i];
+            slew_last_r = right[i];
+          }
+        if (mode == 4)
+          {
+            left[i] = alpha * left_history + (1.0f - alpha) * left[i];
+            right[i] = alpha * right_history + (1.0f - alpha) * right[i];
+
+            auto slew_soft = [] (float x, float limit)
+              {
+                return limit * std::tanh(x / limit);
+              };
+            float dl = left[i] - slew_last_l;
+            float dr = right[i] - slew_last_r;
+
+            left[i] = slew_last_l + slew_soft(dl, slew_delta);
+            right[i] = slew_last_r + slew_soft(dr, slew_delta);
+
+            slew_last_l = left[i];
+            slew_last_r = right[i];
+          }
+        if (mode == 3)
+          {
+            float slew_delta_l = left[i] - slew_last_l;
+            float abs_delta_l = std::abs(slew_delta_l);
+            float alpha_l = slew_delta / (slew_delta + abs_delta_l + 1e-7f);
+
+            left[i] = slew_last_l + alpha_l * slew_delta_l;
+
+            float slew_delta_r = right[i] - slew_last_r;
+            float abs_delta_r = std::abs(slew_delta_r);
+            float alpha_r = slew_delta / (slew_delta + abs_delta_r + 1e-7f);
+
+            right[i] = slew_last_r + alpha_r * slew_delta_r;
+
+            slew_last_l = left[i];
+            slew_last_r = right[i];
+          }
+        if (mode == 2)
+          {
+            left[i] = std::clamp (left[i], slew_last_l - slew_delta, slew_last_l + slew_delta);
+            right[i] = std::clamp (right[i], slew_last_r - slew_delta, slew_last_r + slew_delta);
+
+            slew_last_l = left[i];
+            slew_last_r = right[i];
           }
       }
 

@@ -16,9 +16,19 @@ public:
     {
       addParameter (drive = new AudioParameterFloat ({ "drive", 1 }, "Drive", -6.0f, 36.0f, 0.0f));
       addParameter (symmetry = new AudioParameterFloat ({ "symmetry", 1 }, "Symmetry", -100.0f, 100.0f, 0.0f));
-      addParameter (mode = new AudioParameterChoice ({ "mode", 1 }, "Distortion Mode", { "cheaptanh+adaa", "sin", "tanh+asym+adaa" }, 0));
+      addParameter (mode = new AudioParameterChoice ({ "mode", 1 }, "Distortion Mode",
+        {
+          "cheaptanh+adaa",
+          "sin",
+          "tanh+asym+adaa+slew2",
+          "tanh+asym+adaa+slew3",
+          "tanh+asym+adaa+slew4",
+          "tanh+asym+adaa+slew5",
+          "tanh+asym+adaa+slew6"
+        }, 0));
       addParameter (oversample_param = new AudioParameterChoice ({ "oversample", 1 }, "Oversample", { "1x", "2x", "4x", "8x" }, 0));
       addParameter (bias = new AudioParameterFloat ({ "bias", 1 }, "Bias", -0.5f, 0.5f, 0.0f));
+      addParameter (slew = new AudioParameterFloat ({ "slew", 1 }, "Slew", 0.0f, 100.0f, 100.0f));
       addParameter (mix = new AudioParameterFloat ({ "mix", 1 }, "Mix", 0.0f, 100.0f, 100.0f));
 
       auto freq_range = NormalisableRange<float>(
@@ -100,6 +110,7 @@ public:
      distortion_dsp.set_oversample (new_oversample);
      distortion_dsp.set_drive (drive->get(), now);
      distortion_dsp.set_symmetry (symmetry->get(), now);
+     distortion_dsp.set_slew (slew->get());
      distortion_dsp.set_mode (mode->getIndex());
      distortion_dsp.set_pre_eq_params (pre_eq_freq->get(), pre_eq_gain->get(), pre_eq_Q->get(), now);
      distortion_dsp.set_post_lp (post_lp_freq->get(), now);
@@ -168,6 +179,7 @@ private:
     AudioParameterFloat* symmetry;
     AudioParameterFloat* mix;
     AudioParameterFloat* bias;
+    AudioParameterFloat* slew;
     AudioParameterFloat* pre_eq_freq;
     AudioParameterFloat* pre_eq_gain;
     AudioParameterFloat* pre_eq_Q;
