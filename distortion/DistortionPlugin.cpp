@@ -24,7 +24,8 @@ public:
           "tanh+asym+adaa+slew3",
           "tanh+asym+adaa+slew4",
           "tanh+asym+adaa+slew5",
-          "tanh+asym+adaa+slew6"
+          "tanh+asym+adaa+slew6",
+          "tanh+asym+adaa+slew7"
         }, 0));
       addParameter (oversample_param = new AudioParameterChoice ({ "oversample", 1 }, "Oversample", { "1x", "2x", "4x", "8x" }, 0));
       addParameter (bias = new AudioParameterFloat ({ "bias", 1 }, "Bias", -0.5f, 0.5f, 0.0f));

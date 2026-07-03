@@ -480,6 +480,14 @@ class DistortionDSP
   float                                     slew_last_r = 0;
   float                                     prev_target = 0;
 
+  struct SlewLimiterState
+  {
+    float slew_last = 0.0f;
+    float prev_target = 0.0f;
+  };
+  SlewLimiterState                          slew_state_l;
+  SlewLimiterState                          slew_state_r;
+
   // https://www.musicdsp.org/en/latest/Other/238-rational-tanh-approximation.html
   float
   cheap_tanh (float x)
@@ -772,7 +780,7 @@ public:
             right[i] = std::sin (right[i]);
           }
       }
-    if (mode == 2 || mode == 3 || mode == 4 || mode == 5 || mode == 6)
+    if (mode == 2 || mode == 3 || mode == 4 || mode == 5 || mode == 6 || mode == 7)
       {
         if (symmetry_smoother.is_constant())
           {
@@ -788,50 +796,108 @@ public:
     for (size_t i = 0; i < n_samples * oversample; i++)
       {
         float alpha = expf(-2.0f * M_PI * 20000 / (oversample * sample_rate));
+        if (mode == 7)
+          {
+            auto process_slew = [slew_delta](float& sample, SlewLimiterState& state)
+              {
+                float y = state.slew_last;
+                float slew_delta_signed = state.prev_target > state.slew_last ? slew_delta : -slew_delta;
+                //float t = (slew_last_l - prev_target) / (left[i] - slew_last_l - slew_delta_signed);
+                float y0 = state.slew_last;
+                float M_target = sample - state.prev_target;
+
+                float tt = -1.0f; // Default if it doesn't intersect in this frame
+                float denominator = M_target - slew_delta_signed;
+
+                if (std::abs (denominator) > 1e-6f)
+                  {
+                    float intersection_t = (y0 - state.prev_target) / denominator;
+
+                    // Check if the intersection point actually happens within this sample frame
+                    if (intersection_t >= 0.0f && intersection_t < 1.0f) {
+                        tt = intersection_t;
+                    }
+                  }
+                if (tt >= 0.f)
+                  {
+                    y += tt * slew_delta_signed;
+                    y = std::clamp (sample, y + (1 - tt) * -slew_delta, y + (1 - tt) * slew_delta);
+                  }
+                else
+                  {
+                    y = std::clamp (sample, y - slew_delta, y + slew_delta);
+                  }
+
+                state.prev_target = sample;
+                sample = y;
+                state.slew_last = y;
+              };
+
+            process_slew (left[i], slew_state_l);
+            process_slew (right[i], slew_state_r);
+          }
         if (mode == 6)
           {
-            float y = slew_last_l;
-            float out;
-            float slew_delta_signed = prev_target > slew_last_l ? slew_delta : -slew_delta;
-            float t = (slew_last_l - prev_target) / (left[i] - slew_last_l - slew_delta_signed);
-            if (t > 0 && t < 1)
+            auto process_slew = [slew_delta](float& sample, SlewLimiterState& state)
               {
-                float y0 = slew_last_l;
-                float yt = y0 + t * slew_delta_signed;
-                y = std::clamp (left[i], yt + (1 - t) * -slew_delta, yt + (1 - t) * slew_delta);
+                float y = state.slew_last;
+                float out;
 
-                float area1 = (y0 + yt) * t * 0.5f;
-                float area2 = (yt + y) * (1 - t) * 0.5f;
-                out = area1 + area2;
-              }
-            else
-              {
-                y = std::clamp (left[i], slew_last_l - slew_delta, slew_last_l + slew_delta);
-                out = (slew_last_l + y) * 0.5f;
-              }
-            prev_target = left[i];
-            left[i] = out;
-            slew_last_l = y;
+                float slew_delta_signed = state.prev_target > state.slew_last ? slew_delta : -slew_delta;
+
+                // Avoid division by zero if the denominator hits exactly 0
+                float denominator = sample - state.prev_target - slew_delta_signed;
+                float t = (denominator != 0.0f) ? (state.slew_last - state.prev_target) / denominator : -1.0f;
+
+                if (t > 0.0f && t < 1.0f)
+                  {
+                    float y0 = state.slew_last;
+                    float yt = y0 + t * slew_delta_signed;
+                    y = std::clamp (sample, yt + (1.0f - t) * -slew_delta, yt + (1.0f - t) * slew_delta);
+
+                    float area1 = (y0 + yt) * t * 0.5f;
+                    float area2 = (yt + y) * (1.0f - t) * 0.5f;
+                    out = area1 + area2;
+                  }
+                else
+                {
+                  y = std::clamp (sample, state.slew_last - slew_delta, state.slew_last + slew_delta);
+                  out = (state.slew_last + y) * 0.5f;
+                }
+
+                state.prev_target = sample;
+                sample = out;
+                state.slew_last = y;
+            };
+
+            process_slew (left[i], slew_state_l);
+            process_slew (right[i], slew_state_r);
           }
         if (mode == 5)
           {
-            int sub_steps = 64;
-            float y = slew_last_l;
-            float sub_slew_delta = slew_delta / sub_steps;
-            for (int s = 0; s < sub_steps; s++)
+            auto process_sub_slew = [slew_delta](float& sample, SlewLimiterState& state)
               {
-                // Linear interpolation of target within this sample period
-                float t = (s + 0.5f) / sub_steps;           // or s / sub_steps, experiment
-                float target = prev_target * (1.0f - t) + left[i] * t;
+                constexpr int sub_steps = 64;
+                float y = state.slew_last;
+                float sub_slew_delta = slew_delta / static_cast<float>(sub_steps);
 
-                float delta = target - y;
-                y += std::clamp (delta, -sub_slew_delta, sub_slew_delta);
-              }
-            prev_target = left[i];
-            left[i] = y;
+                for (int s = 0; s < sub_steps; s++)
+                  {
+                    // Linear interpolation of target within this sample period
+                    float t = (s + 0.5f) / static_cast<float>(sub_steps);
+                    float target = state.prev_target * (1.0f - t) + sample * t;
 
-            slew_last_l = left[i];
-            slew_last_r = right[i];
+                    float delta = target - y;
+                    y += std::clamp(delta, -sub_slew_delta, sub_slew_delta);
+                  }
+
+                state.prev_target = sample;
+                sample = y;
+                state.slew_last = y;
+              };
+
+            process_sub_slew (left[i], slew_state_l);
+            process_sub_slew (right[i], slew_state_r);
           }
         if (mode == 4)
           {
