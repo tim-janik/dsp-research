@@ -634,7 +634,7 @@ public:
     filters_enabled = enable;
   }
   void
-  process_block (float *left_in, float *right_in, int n_samples)
+  process_block (float *left_in, float *right_in, uint n_samples)
   {
     if (!n_samples)
       {
@@ -647,7 +647,7 @@ public:
 
     float dry_delay_left[n_samples];
     float dry_delay_right[n_samples];
-    for (int i = 0; i < n_samples; i++)
+    for (uint i = 0; i < n_samples; i++)
       dry_delay.process_sample (left_in[i], right_in[i], dry_delay_left[i], dry_delay_right[i]);
 
     if (filters_enabled)
@@ -676,7 +676,7 @@ public:
     if (drive_factor_smoother.is_constant())
       {
         float drive_factor = drive_factor_smoother.get_next();
-        for (int i = 0; i < n_samples; i++)
+        for (uint i = 0; i < n_samples; i++)
           {
             left_in[i] *= drive_factor;
             right_in[i] *= drive_factor;
@@ -684,7 +684,7 @@ public:
       }
     else
       {
-        for (int i = 0; i < n_samples; i++)
+        for (uint i = 0; i < n_samples; i++)
           {
             float drive_factor = drive_factor_smoother.get_next();
             left_in[i] *= drive_factor;
@@ -710,18 +710,18 @@ public:
 
         float left_pre_F[n_samples * oversample];
         float right_pre_F[n_samples * oversample];
-        for (size_t i = 0; i < n_samples * oversample; i++)
+        for (uint i = 0; i < n_samples * oversample; i++)
           {
             left[i] = std::clamp (left[i], -10.f, 10.f);
             right[i] = std::clamp (right[i], -10.f, 10.f);
           }
-        for (size_t i = 0; i < n_samples * oversample; i++)
+        for (uint i = 0; i < n_samples * oversample; i++)
           {
             left_pre_F[i] = cheap_tanh_antiderivative_approx (left[i]);
             right_pre_F[i] = cheap_tanh_antiderivative_approx (right[i]);
           }
 
-        for (size_t i = 0; i < n_samples * oversample; i++)
+        for (uint i = 0; i < n_samples * oversample; i++)
           {
             auto adaa = [&] (float x, float last_x, float F, float last_F)
               {
@@ -774,7 +774,7 @@ public:
       }
     if (mode == 1)
       {
-        for (size_t i = 0; i < n_samples * oversample; i++)
+        for (uint i = 0; i < n_samples * oversample; i++)
           {
             left[i] = std::sin (left[i]);
             right[i] = std::sin (right[i]);
@@ -788,12 +788,12 @@ public:
           }
         else
           {
-            for (size_t i = 0; i < n_samples * oversample; i += oversample)
+            for (uint i = 0; i < n_samples * oversample; i += oversample)
               process_with_symmetry (left + i, right + i, oversample, symmetry_smoother.get_next());
           }
       }
     float slew_delta = 2.0 / (slew_time * sample_rate * oversample);
-    for (size_t i = 0; i < n_samples * oversample; i++)
+    for (uint i = 0; i < n_samples * oversample; i++)
       {
         float alpha = expf(-2.0f * M_PI * 20000 / (oversample * sample_rate));
         if (mode == 7)
@@ -998,7 +998,7 @@ public:
       {
         float mix = mix_smoother.get_next();
 
-        for (int i = 0; i < n_samples; i++)
+        for (uint i = 0; i < n_samples; i++)
           {
             left_in[i] = dry_delay_left[i] + mix * (left_in[i] - dry_delay_left[i]);
             right_in[i] = dry_delay_right[i] + mix * (right_in[i] - dry_delay_right[i]);
@@ -1006,7 +1006,7 @@ public:
       }
     else
       {
-        for (int i = 0; i < n_samples; i++)
+        for (uint i = 0; i < n_samples; i++)
           {
             float mix = mix_smoother.get_next();
 
