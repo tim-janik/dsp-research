@@ -402,8 +402,10 @@ class DistortionDSP
   struct ADAATables
   {
     static constexpr int N_TABLES = 31; // odd to have the center table represent a linear function
-    struct TableRange { static constexpr float range() { return 4; } };
-    std::array<std::unique_ptr<ADAATable<TableRange, 1024>>, N_TABLES> tables;
+    struct TableRange4  { static constexpr float range() { return 4; } };
+    struct TableRangePi { static constexpr float range() { return M_PI; } };
+    std::array<std::unique_ptr<ADAATable<TableRange4, 1024>>,        N_TABLES> tanh_tables;
+    std::array<std::unique_ptr<ADAATable<TableRangePi, 1024, true>>, N_TABLES> sin_tables;
     ADAATables()
     {
       for (size_t i = 0; i < N_TABLES; i++)
@@ -418,8 +420,11 @@ class DistortionDSP
                 return (x / (1 - exp (-kx)) - 1./k)*2;
             };
           float symmetry = (i / (N_TABLES - 1.0)) * 2 - 1;
-          tables[i] = std::make_unique<ADAATable<TableRange, 1024>> (
+          tanh_tables[i] = std::make_unique<ADAATable<TableRange4, 1024>> (
             [&] (double x) { return distort_asymmetric (tanh (x), symmetry); }
+          );
+          sin_tables[i] = std::make_unique<ADAATable<TableRangePi, 1024, true>> (
+            [&] (double x) { return distort_asymmetric (sin (x), symmetry); }
           );
         }
     }
@@ -785,12 +790,24 @@ public:
       {
         if (symmetry_smoother.is_constant())
           {
-            process_with_symmetry (left, right, n_samples * oversample, symmetry_smoother.get_next());
+            process_with_symmetry (left, right, n_samples * oversample, symmetry_smoother.get_next(), adaa_tables.tanh_tables);
           }
         else
           {
             for (uint i = 0; i < n_samples * oversample; i += oversample)
-              process_with_symmetry (left + i, right + i, oversample, symmetry_smoother.get_next());
+              process_with_symmetry (left + i, right + i, oversample, symmetry_smoother.get_next(), adaa_tables.tanh_tables);
+          }
+      }
+    if (mode == 8)
+      {
+        if (symmetry_smoother.is_constant())
+          {
+            process_with_symmetry (left, right, n_samples * oversample, symmetry_smoother.get_next(), adaa_tables.sin_tables);
+          }
+        else
+          {
+            for (uint i = 0; i < n_samples * oversample; i += oversample)
+              process_with_symmetry (left + i, right + i, oversample, symmetry_smoother.get_next(), adaa_tables.sin_tables);
           }
       }
     float slew_delta = 2.0 / (slew_time * sample_rate * oversample);
@@ -1017,8 +1034,8 @@ public:
       }
   }
 
-  void
-  process_with_symmetry (float *left, float *right, int n_samples, float symmetry)
+  template<class TableArray> void
+  process_with_symmetry (float *left, float *right, int n_samples, float symmetry, const TableArray& table_array)
   {
     // map symmetry [-100..100] to table index [0..N_TABLES - 1]
     float ftable_index = (symmetry * 0.01f + 1) / 2 * (adaa_tables.N_TABLES - 1);
@@ -1027,8 +1044,8 @@ public:
     table_index = std::min (table_index, adaa_tables.N_TABLES - 2);
     float frac = ftable_index - table_index;
 
-    auto& table_1 = *adaa_tables.tables[table_index];
-    auto& table_2 = *adaa_tables.tables[table_index + 1];
+    auto& table_1 = *table_array[table_index];
+    auto& table_2 = *table_array[table_index + 1];
 
     if (last_table != table_index)
       {
