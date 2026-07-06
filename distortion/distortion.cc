@@ -473,13 +473,30 @@ main (int argc, char **argv)
     }
   else if (argc == 2 && !strcmp (argv[1], "adaa-table"))
     {
-      ADAATable<4, 3> table ([] (double x) { return tanh (x); });
+      auto antiderivative_tanh = [] (double x)
+        {
+          double ax = std::abs(x);
+          return ax + std::log1p(std::exp(-2.0 * ax)) - std::log(2.0);
+        };
+      struct TableRange { static constexpr float range() { return 4; } };
+      ADAATable<TableRange, 32> table ([] (double x) { return tanh (x); });
       for (double x = -5; x < 5; x += 0.001)
-        printf ("%f %f %f #f\n", x, table.f (x), tanh (x));
+        printf ("%f %.17g %.17g #f\n", x, table.f (x), tanh (x));
       for (double x = -5; x < 5; x += 0.001)
-        printf ("%f %f %f #F\n", x, table.F (x), log (cosh (x)));
+        printf ("%f %.17g %.17g #F\n", x, table.F (x), antiderivative_tanh (x));
       for (double x = -5; x < 5; x += 0.001)
-        printf ("%f %f %f #d\n", x, (table.F (x + 0.001) - table.F (x))/0.001, tanh (x));
+        printf ("%f %.17g %.17g #d\n", x, (table.F (x + 0.001) - table.F (x))/0.001, tanh (x));
+    }
+  else if (argc == 2 && !strcmp (argv[1], "adaa-table-sin"))
+    {
+      struct TableRange { static constexpr float range() { return M_PI; } };
+      ADAATable<TableRange, 32, true> table ([] (double x) { return sin (x) + 0.2; });
+      for (double x = -15; x < 15; x += 0.001)
+        printf ("%f %.17g %.17g #f\n", x, table.f (x), sin (x) + 0.2);
+      for (double x = -15; x < 15; x += 0.001)
+        printf ("%f %.17g %.17g #F\n", x, table.F (x), -cos (x) + 0.2 * x);
+      for (double x = -15; x < 15; x += 0.001)
+        printf ("%f %.17g %.17g #d\n", x, (table.F (x + 0.001) - table.F (x))/0.001, sin (x) + 0.2);
     }
   else
     {

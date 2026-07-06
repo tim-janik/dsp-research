@@ -402,7 +402,8 @@ class DistortionDSP
   struct ADAATables
   {
     static constexpr int N_TABLES = 31; // odd to have the center table represent a linear function
-    std::array<std::unique_ptr<ADAATable<4, 1024>>, N_TABLES> tables;
+    struct TableRange { static constexpr float range() { return 4; } };
+    std::array<std::unique_ptr<ADAATable<TableRange, 1024>>, N_TABLES> tables;
     ADAATables()
     {
       for (size_t i = 0; i < N_TABLES; i++)
@@ -417,7 +418,7 @@ class DistortionDSP
                 return (x / (1 - exp (-kx)) - 1./k)*2;
             };
           float symmetry = (i / (N_TABLES - 1.0)) * 2 - 1;
-          tables[i] = std::make_unique<ADAATable<4, 1024>> (
+          tables[i] = std::make_unique<ADAATable<TableRange, 1024>> (
             [&] (double x) { return distort_asymmetric (tanh (x), symmetry); }
           );
         }

@@ -1,11 +1,51 @@
 #include <functional>
 
-template<int RANGE, int BINS>
+template<class RangeClass, int BINS, bool PERIODIC = false>
 class ADAATable
 {
+  static constexpr float RANGE = RangeClass::range();
+
   std::array<float, BINS + 1> f_;
   std::array<float, BINS + 1> F_;
+  float                       period_integral_;
 
+  struct Wrap
+  {
+    int   ibin;
+    float frac;
+    int   periods;
+  };
+
+  Wrap
+  periodic_wrap (float x) const
+  {
+    Wrap wrap;
+
+    constexpr float P = 2.f * RANGE;
+
+    x += RANGE;
+
+    wrap.periods = std::floor (x / P);
+    x -= wrap.periods * P;
+
+    float fbin = x * float (BINS / (RANGE * 2.0));
+    if (fbin < 0)
+      {
+        wrap.ibin = 0;
+        wrap.frac = 0;
+      }
+    else if (fbin >= BINS)
+      {
+        wrap.ibin = BINS - 1;
+        wrap.frac = 1;
+      }
+    else
+      {
+        wrap.ibin = fbin;
+        wrap.frac = fbin - wrap.ibin;
+      }
+    return wrap;
+  }
 public:
   ADAATable (std::function<double(double)> f)
   {
@@ -25,6 +65,7 @@ public:
         Fx += 0.5f * dx * (f_[i] + f_[i+1]);
         F[i + 1] = Fx;
       }
+    period_integral_ = F[BINS];
 
     /* shift antiderivative so that smallest elements are close to zero
      *   -> better resolution for small floats
@@ -35,36 +76,64 @@ public:
   }
 
   float
-  f (float x)
+  f (float x) const
   {
-    float fbin = (x + float (RANGE)) * float (BINS / (RANGE * 2.0));
+    int ibin;
+    float frac;
+    if constexpr (PERIODIC)
+      {
+        auto w = periodic_wrap (x);
 
-    if (fbin < 0)
-      return f_[0];
-    if (fbin >= BINS)
-      return f_[BINS];
+        ibin = w.ibin;
+        frac = w.frac;
+      }
+    else
+      {
+        float fbin = (x + float (RANGE)) * float (BINS / (RANGE * 2.0));
 
-    int ibin = (int) fbin;
+        if (fbin < 0)
+          return f_[0];
+        if (fbin >= BINS)
+          return f_[BINS];
 
-    float frac = fbin - ibin;
+        ibin = (int) fbin;
+        frac = fbin - ibin;
+      }
     return f_[ibin] + frac * (f_[ibin + 1] - f_[ibin]);
   }
 
   float
-  F (float x)
+  F (float x) const
   {
-    float fbin = (x + float (RANGE)) * float (BINS / (RANGE * 2.0));
+    Wrap wrap;
+    int ibin;
+    float frac;
+    if constexpr (PERIODIC)
+      {
+        wrap = periodic_wrap (x);
 
-    if (fbin < 0)
-      return F_[0] + (x + RANGE) * f_[0];
-    if (fbin >= BINS)
-      return F_[BINS] + (x - RANGE) * f_[BINS];
+        ibin = wrap.ibin;
+        frac = wrap.frac;
+      }
+    else
+      {
+        float fbin = (x + float (RANGE)) * float (BINS / (RANGE * 2.0));
 
-    int ibin = (int) fbin;
+        if (fbin < 0)
+          return F_[0] + (x + RANGE) * f_[0];
+        if (fbin >= BINS)
+          return F_[BINS] + (x - RANGE) * f_[BINS];
 
-    float frac = fbin - ibin;
+        ibin = (int) fbin;
+        frac = fbin - ibin;
+      }
+
     float dx = frac * 2.f * RANGE / BINS;
-    return F_[ibin] + dx * f_[ibin] + 0.5f * dx * dx * (f_[ibin+1] - f_[ibin]) / (2.f * RANGE / BINS);;
+
+    float y = F_[ibin] + dx * f_[ibin] + 0.5f * dx * dx * (f_[ibin+1] - f_[ibin]) / (2.f * RANGE / BINS);;
+    if constexpr (PERIODIC)
+      y += wrap.periods * period_integral_;
+    return y;
   }
 
 };
