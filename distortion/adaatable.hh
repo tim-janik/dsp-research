@@ -14,15 +14,24 @@ public:
       f_[i] = f ((i / double (BINS) * 2 - 1) * RANGE);
 
     // build antiderivative F(x) table
+    std::vector<double> F (BINS + 1);
+
     double Fx = 0;
     double dx = 2.0 * RANGE / BINS;
-    F_[0] = Fx;
+    F[0] = Fx;
 
     for (size_t i = 0; i < BINS; i++)
       {
         Fx += 0.5f * dx * (f_[i] + f_[i+1]);
-        F_[i + 1] = Fx;
+        F[i + 1] = Fx;
       }
+
+    /* shift antiderivative so that smallest elements are close to zero
+     *   -> better resolution for small floats
+     */
+    auto min_F = *std::min_element (F.begin(), F.end());
+    for (size_t i = 0; i < BINS + 1; i++)
+      F_[i] = F[i] - min_F;
   }
 
   float
