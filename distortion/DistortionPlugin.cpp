@@ -20,12 +20,14 @@ public:
         {
           "cheaptanh+adaa",
           "sin",
-          "tanh+asym+adaa+slew2",
-          "tanh+asym+adaa+slew3",
-          "tanh+asym+adaa+slew4",
-          "tanh+asym+adaa+slew5",
-          "tanh+asym+adaa+slew6",
-          "tanh+asym+adaa+slew7",
+          "tanh+asym+adaa+clamp2",
+          "tanh+asym+adaa+os3",
+          "tanh+asym+adaa+slavg4",
+          "tanh+asym+adaa+slli5",
+          "sin+adaa+clamp6",
+          "sin+adaa+os7",
+          "sin+adaa+avg8",
+          "sin+adaa+li9",
           "sin+adaa"
         }, 0));
       addParameter (oversample_param = new AudioParameterChoice ({ "oversample", 1 }, "Oversample", { "1x", "2x", "4x", "8x" }, 0));

@@ -629,7 +629,7 @@ public:
   void
   set_slew (float slew)
   {
-    float min_time = 1 / 48000.;
+    float min_time = 1 / (48000. * /* oversample */ 4);
     float max_time = 0.200;
     slew_time = min_time * powf (max_time / min_time, slew * 0.01f);
     slew_p = slew;
@@ -786,7 +786,7 @@ public:
             right[i] = std::sin (right[i]);
           }
       }
-    if (mode == 2 || mode == 3 || mode == 4 || mode == 5 || mode == 6 || mode == 7)
+    if (mode == 2 || mode == 3 || mode == 4 || mode == 5)
       {
         if (symmetry_smoother.is_constant())
           {
@@ -798,7 +798,7 @@ public:
               process_with_symmetry (left + i, right + i, oversample, symmetry_smoother.get_next(), adaa_tables.tanh_tables);
           }
       }
-    if (mode == 8)
+    if (mode == 6 || mode == 7 || mode == 8 || mode == 9 || mode == 10)
       {
         if (symmetry_smoother.is_constant())
           {
@@ -813,8 +813,7 @@ public:
     float slew_delta = 2.0 / (slew_time * sample_rate * oversample);
     for (uint i = 0; i < n_samples * oversample; i++)
       {
-        float alpha = expf(-2.0f * M_PI * 20000 / (oversample * sample_rate));
-        if (mode == 7)
+        if (mode == 5 || mode == 9)
           {
             auto process_slew = [slew_delta](float& sample, SlewLimiterState& state)
               {
@@ -854,7 +853,7 @@ public:
             process_slew (left[i], slew_state_l);
             process_slew (right[i], slew_state_r);
           }
-        if (mode == 6)
+        if (mode == 4 || mode == 8)
           {
             auto process_slew = [slew_delta](float& sample, SlewLimiterState& state)
               {
@@ -891,7 +890,7 @@ public:
             process_slew (left[i], slew_state_l);
             process_slew (right[i], slew_state_r);
           }
-        if (mode == 5)
+        if (mode == 3 || mode == 7)
           {
             auto process_sub_slew = [slew_delta](float& sample, SlewLimiterState& state)
               {
@@ -917,42 +916,7 @@ public:
             process_sub_slew (left[i], slew_state_l);
             process_sub_slew (right[i], slew_state_r);
           }
-        if (mode == 4)
-          {
-            left[i] = alpha * left_history + (1.0f - alpha) * left[i];
-            right[i] = alpha * right_history + (1.0f - alpha) * right[i];
-
-            auto slew_soft = [] (float x, float limit)
-              {
-                return limit * std::tanh(x / limit);
-              };
-            float dl = left[i] - slew_last_l;
-            float dr = right[i] - slew_last_r;
-
-            left[i] = slew_last_l + slew_soft(dl, slew_delta);
-            right[i] = slew_last_r + slew_soft(dr, slew_delta);
-
-            slew_last_l = left[i];
-            slew_last_r = right[i];
-          }
-        if (mode == 3)
-          {
-            float slew_delta_l = left[i] - slew_last_l;
-            float abs_delta_l = std::abs(slew_delta_l);
-            float alpha_l = slew_delta / (slew_delta + abs_delta_l + 1e-7f);
-
-            left[i] = slew_last_l + alpha_l * slew_delta_l;
-
-            float slew_delta_r = right[i] - slew_last_r;
-            float abs_delta_r = std::abs(slew_delta_r);
-            float alpha_r = slew_delta / (slew_delta + abs_delta_r + 1e-7f);
-
-            right[i] = slew_last_r + alpha_r * slew_delta_r;
-
-            slew_last_l = left[i];
-            slew_last_r = right[i];
-          }
-        if (mode == 2)
+        if (mode == 2 || mode == 6)
           {
             left[i] = std::clamp (left[i], slew_last_l - slew_delta, slew_last_l + slew_delta);
             right[i] = std::clamp (right[i], slew_last_r - slew_delta, slew_last_r + slew_delta);
