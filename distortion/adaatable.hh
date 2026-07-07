@@ -21,20 +21,16 @@ class ADAATable
   {
     Wrap wrap;
 
-    constexpr float P = 2.f * RANGE;
+    /* map periodicity, [-RANGE..RANGE] -> [0..1] */
+    x = (x + RANGE) * (1.f / (2.f * RANGE));
 
-    x += RANGE;
+    wrap.periods = std::floor (x);
+    x -= wrap.periods;
 
-    wrap.periods = std::floor (x / P);
-    x -= wrap.periods * P;
+    float fbin = x * BINS;
 
-    float fbin = x * float (BINS / (RANGE * 2.0));
-    if (fbin < 0)
-      {
-        wrap.ibin = 0;
-        wrap.frac = 0;
-      }
-    else if (fbin >= BINS)
+    // floating point arithmetic does not guarantee fbin < BINS at this point
+    if (fbin >= BINS)
       {
         wrap.ibin = BINS - 1;
         wrap.frac = 1;
