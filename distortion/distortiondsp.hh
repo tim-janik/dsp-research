@@ -403,9 +403,11 @@ class DistortionDSP
   {
     static constexpr int N_TABLES = 31; // odd to have the center table represent a linear function
     struct TableRange4  { static constexpr float range() { return 4; } };
+    struct TableRange15 { static constexpr float range() { return 15; } };
     struct TableRangePi { static constexpr float range() { return M_PI; } };
     std::array<std::unique_ptr<ADAATable<TableRange4, 1024>>,        N_TABLES> tanh_tables;
     std::array<std::unique_ptr<ADAATable<TableRangePi, 1024, true>>, N_TABLES> sin_tables;
+    std::array<std::unique_ptr<ADAATable<TableRange15, 1024>>,       N_TABLES> west_coast_tables;
     ADAATables()
     {
       for (size_t i = 0; i < N_TABLES; i++)
@@ -425,6 +427,26 @@ class DistortionDSP
           );
           sin_tables[i] = std::make_unique<ADAATable<TableRangePi, 1024, true>> (
             [&] (double x) { return distort_asymmetric (sin (x), symmetry); }
+          );
+          /* Virtual Analog Buchla 259 WaveFolder, DAFx-17, by Sequeda, Pontynen, Valimaki and Parker */
+          west_coast_tables[i] = std::make_unique<ADAATable<TableRange15, 1024>> (
+            [&] (double a)
+              {
+                /* scale folder so that output is approx [-1:1], and f'(0) ~= 1 */
+                const double x = a / 1.6;
+                const double f = 3.0;
+
+                auto sx = x >= 0 ? 1.0 : -1.0;
+                auto V1 = std::abs(x) > 0.6000 ? (0.8333 * x - 0.5000 * sx) : 0;
+                auto V2 = std::abs(x) > 2.9940 ? (0.3768 * x - 1.1281 * sx) : 0;
+                auto V3 = std::abs(x) > 5.4600 ? (0.2829 * x - 1.5446 * sx) : 0;
+                auto V4 = std::abs(x) > 1.8000 ? (0.5743 * x - 1.0338 * sx) : 0;
+                auto V5 = std::abs(x) > 4.0800 ? (0.2673 * x - 1.0907 * sx) : 0;
+
+                auto V = -12.000 * V1 - 27.777 * V2 - 21.428 * V3
+                        + 17.647 * V4 + 36.363 * V5 + 5.000 * x;
+                return distort_asymmetric (V / f, symmetry);
+              }
           );
         }
     }
@@ -810,10 +832,22 @@ public:
               process_with_symmetry (left + i, right + i, oversample, symmetry_smoother.get_next(), adaa_tables.sin_tables);
           }
       }
+    if (mode == 11)
+      {
+        if (symmetry_smoother.is_constant())
+          {
+            process_with_symmetry (left, right, n_samples * oversample, symmetry_smoother.get_next(), adaa_tables.west_coast_tables);
+          }
+        else
+          {
+            for (uint i = 0; i < n_samples * oversample; i += oversample)
+              process_with_symmetry (left + i, right + i, oversample, symmetry_smoother.get_next(), adaa_tables.west_coast_tables);
+          }
+      }
     float slew_delta = 2.0 / (slew_time * sample_rate * oversample);
     for (uint i = 0; i < n_samples * oversample; i++)
       {
-        if (mode == 5 || mode == 9)
+        if (mode == 5 || mode == 9 || mode == 11)
           {
             auto process_slew = [slew_delta](float& sample, SlewLimiterState& state)
               {
