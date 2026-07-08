@@ -345,6 +345,43 @@ public:
   }
 };
 
+class OnePoleLowPass
+{
+public:
+  void
+  reset (float sample_rate, float cutoff)
+  {
+    float k = std::tan (M_PI * cutoff / sample_rate);
+    float norm = 1.0f / (1.0f + K);
+
+    b0 = k * norm;
+    b1 = b0;
+    a1 = (k - 1.0f) * norm;
+
+    x1 = 0.0f;
+    y1 = 0.0f;
+  }
+
+  float
+  process (float input)
+  {
+    float output = b0 * input + b1 * x1 - a1 * y1;
+
+    x1 = input;
+    y1 = output;
+
+    return output;
+  }
+
+private:
+  float b0 = 0.0f;
+  float b1 = 0.0f;
+  float a1 = 0.0f;
+
+  float x1 = 0.0f;
+  float y1 = 0.0f;
+};
+
 template <size_t max_delay_samples_pow2>
 class StereoDelay
 {
@@ -497,6 +534,8 @@ class DistortionDSP
   ParamSmoother<SmootherType::logarithmic>  post_hp_freq_smoother { 20 };
 
   StereoDelay<64> dry_delay;
+  OnePoleLowPass                            west_coast_lpf_left;
+  OnePoleLowPass                            west_coast_lpf_right;
 
   ParamSmoother<SmootherType::linear>       symmetry_smoother     { 0 };
   ParamSmoother<SmootherType::logarithmic>  drive_factor_smoother { 1 };
@@ -566,6 +605,9 @@ public:
     left_over_delay_history.fill (0);
     right_over_delay_history.fill (0);
     dry_delay.reset();
+
+    west_coast_lpf_left.reset (sample_rate, 1333);
+    west_coast_lpf_right.reset (sample_rate, 1333);
 
     last_table = -1;
   }
@@ -832,7 +874,7 @@ public:
               process_with_symmetry (left + i, right + i, oversample, symmetry_smoother.get_next(), adaa_tables.sin_tables);
           }
       }
-    if (mode == 11)
+    if (mode == 11 || mode == 12)
       {
         if (symmetry_smoother.is_constant())
           {
@@ -847,7 +889,7 @@ public:
     float slew_delta = 2.0 / (slew_time * sample_rate * oversample);
     for (uint i = 0; i < n_samples * oversample; i++)
       {
-        if (mode == 5 || mode == 9 || mode == 11)
+        if (mode == 5 || mode == 9 || mode == 11 || mode == 12)
           {
             auto process_slew = [slew_delta](float& sample, SlewLimiterState& state)
               {
@@ -1007,6 +1049,14 @@ public:
 
             post_hp_freq_smoother.process_block (freq_hp, n_samples);
             post_hp_filter.process_mod (SVF::HP, left_in, right_in, freq_hp, Q_inv_lp_hp, nullptr, n_samples);
+          }
+      }
+    if (mode == 12)
+      {
+        for (uint i = 0; i < n_samples; i++)
+          {
+            left_in[i] = west_coast_lpf_left.process (left_in[i]);
+            right_in[i] = west_coast_lpf_right.process (right_in[i]);
           }
       }
 
