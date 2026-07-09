@@ -352,7 +352,7 @@ public:
   reset (float sample_rate, float cutoff)
   {
     float k = std::tan (M_PI * cutoff / sample_rate);
-    float norm = 1.0f / (1.0f + K);
+    float norm = 1.0f / (1.0f + k);
 
     b0 = k * norm;
     b1 = b0;
@@ -439,16 +439,23 @@ class DistortionDSP
   struct ADAATables
   {
     static constexpr int N_TABLES = 31; // odd to have the center table represent a linear function
-    struct TableRange4  { static constexpr float range() { return 4; } };
-    struct TableRange15 { static constexpr float range() { return 15; } };
-    struct TableRangePi { static constexpr float range() { return M_PI; } };
+    struct TableRange1    { static constexpr float range() { return 1; } };
+    struct TableRange2    { static constexpr float range() { return 2; } };
+    struct TableRange4    { static constexpr float range() { return 4; } };
+    struct TableRange15   { static constexpr float range() { return 15; } };
+    struct TableRangePi   { static constexpr float range() { return M_PI; } };
     std::array<std::unique_ptr<ADAATable<TableRange4, 1024>>,        N_TABLES> tanh_tables;
     std::array<std::unique_ptr<ADAATable<TableRangePi, 1024, true>>, N_TABLES> sin_tables;
     std::array<std::unique_ptr<ADAATable<TableRange15, 1024>>,       N_TABLES> west_coast_tables;
+    std::array<std::unique_ptr<ADAATable<TableRange1, 512>>,         N_TABLES> hard_clip_tables;
+    std::array<std::unique_ptr<ADAATable<TableRange2, 512>>,         N_TABLES> soft_clip3_tables;
+    std::array<std::unique_ptr<ADAATable<TableRange2, 512>>,         N_TABLES> soft_clip4_tables;
+    std::array<std::unique_ptr<ADAATable<TableRange2, 512>>,         N_TABLES> soft_clip5_tables;
     ADAATables()
     {
       for (size_t i = 0; i < N_TABLES; i++)
         {
+          auto sign = [] (double x) { return x >= 0 ? 1.0 : -1.0; };
           auto distort_asymmetric = [&] (double x, double s)
              {
               double k  = s * 10;  // symmetry between -1 and 1 scales to k between -10 and 10
@@ -484,6 +491,27 @@ class DistortionDSP
                         + 17.647 * V4 + 36.363 * V5 + 5.000 * x;
                 return distort_asymmetric (V / f, symmetry);
               }
+          );
+          hard_clip_tables[i] = std::make_unique<ADAATable<TableRange1, 512>> (
+            [&] (double x) { return distort_asymmetric (std::clamp (x, -1.0, 1.0), symmetry); }
+          );
+          soft_clip3_tables[i] = std::make_unique<ADAATable<TableRange2, 512>> (
+            [&] (double x) {
+              double y = pow (std::tanh (pow (std::abs(x), 3)), 1.0 / 3) * sign (x);
+              return distort_asymmetric (y, symmetry);
+            }
+          );
+          soft_clip4_tables[i] = std::make_unique<ADAATable<TableRange2, 512>> (
+            [&] (double x) {
+              double y = pow (std::tanh (pow (std::abs(x), 4)), 1.0 / 4) * sign (x);
+              return distort_asymmetric (y, symmetry);
+            }
+          );
+          soft_clip5_tables[i] = std::make_unique<ADAATable<TableRange2, 512>> (
+            [&] (double x) {
+              double y = pow (std::tanh (pow (std::abs(x), 5)), 0.2) * sign (x);
+              return distort_asymmetric (y, symmetry);
+            }
           );
         }
     }
@@ -850,46 +878,44 @@ public:
             right[i] = std::sin (right[i]);
           }
       }
+    auto process_with_tables = [&] (auto& tables)
+      {
+        if (symmetry_smoother.is_constant())
+          {
+            process_with_symmetry (left, right, n_samples * oversample, symmetry_smoother.get_next(), tables);
+          }
+        else
+          {
+            for (uint i = 0; i < n_samples * oversample; i += oversample)
+              process_with_symmetry (left + i, right + i, oversample, symmetry_smoother.get_next(), tables);
+          }
+      };
+
     if (mode == 2 || mode == 3 || mode == 4 || mode == 5)
-      {
-        if (symmetry_smoother.is_constant())
-          {
-            process_with_symmetry (left, right, n_samples * oversample, symmetry_smoother.get_next(), adaa_tables.tanh_tables);
-          }
-        else
-          {
-            for (uint i = 0; i < n_samples * oversample; i += oversample)
-              process_with_symmetry (left + i, right + i, oversample, symmetry_smoother.get_next(), adaa_tables.tanh_tables);
-          }
-      }
+      process_with_tables (adaa_tables.tanh_tables);
+
     if (mode == 6 || mode == 7 || mode == 8 || mode == 9 || mode == 10)
-      {
-        if (symmetry_smoother.is_constant())
-          {
-            process_with_symmetry (left, right, n_samples * oversample, symmetry_smoother.get_next(), adaa_tables.sin_tables);
-          }
-        else
-          {
-            for (uint i = 0; i < n_samples * oversample; i += oversample)
-              process_with_symmetry (left + i, right + i, oversample, symmetry_smoother.get_next(), adaa_tables.sin_tables);
-          }
-      }
+      process_with_tables (adaa_tables.sin_tables);
+
     if (mode == 11 || mode == 12)
-      {
-        if (symmetry_smoother.is_constant())
-          {
-            process_with_symmetry (left, right, n_samples * oversample, symmetry_smoother.get_next(), adaa_tables.west_coast_tables);
-          }
-        else
-          {
-            for (uint i = 0; i < n_samples * oversample; i += oversample)
-              process_with_symmetry (left + i, right + i, oversample, symmetry_smoother.get_next(), adaa_tables.west_coast_tables);
-          }
-      }
+      process_with_tables (adaa_tables.west_coast_tables);
+
+    if (mode == 13)
+      process_with_tables (adaa_tables.hard_clip_tables);
+
+    if (mode == 14)
+      process_with_tables (adaa_tables.soft_clip3_tables);
+
+    if (mode == 15)
+      process_with_tables (adaa_tables.soft_clip4_tables);
+
+    if (mode == 16)
+      process_with_tables (adaa_tables.soft_clip5_tables);
+
     float slew_delta = 2.0 / (slew_time * sample_rate * oversample);
     for (uint i = 0; i < n_samples * oversample; i++)
       {
-        if (mode == 5 || mode == 9 || mode == 11 || mode == 12)
+        if (mode == 5 || mode == 9 || mode == 11 || mode == 12 || mode == 13 || mode == 14 || mode == 15 || mode == 16)
           {
             auto process_slew = [slew_delta](float& sample, SlewLimiterState& state)
               {

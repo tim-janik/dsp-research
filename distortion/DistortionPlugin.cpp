@@ -30,7 +30,11 @@ public:
           "sin+adaa+li9",
           "sin+adaa",
           "west-coast+adaa",
-          "west-coast+adaa+lpf"
+          "west-coast+adaa+lpf",
+          "hard-clip",
+          "soft-clip3",
+          "soft-clip4",
+          "soft-clip5"
         }, 0));
       addParameter (oversample_param = new AudioParameterChoice ({ "oversample", 1 }, "Oversample", { "1x", "2x", "4x", "8x" }, 0));
       addParameter (bias = new AudioParameterFloat ({ "bias", 1 }, "Bias", -0.5f, 0.5f, 0.0f));
