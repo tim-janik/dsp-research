@@ -538,8 +538,6 @@ class DistortionDSP
   float last_left_F_2 = 0;
   float last_right_F_1 = 0;
   float last_right_F_2 = 0;
-  float left_history = 0;
-  float right_history = 0;
 
   int over_delay = 0;
   std::array<float, MAX_OVERSAMPLE> left_over_delay_history {};
@@ -573,7 +571,6 @@ class DistortionDSP
   float                                     slew_p = 100;
   float                                     slew_last_l = 0;
   float                                     slew_last_r = 0;
-  float                                     prev_target = 0;
 
   struct SlewLimiterState
   {
