@@ -567,8 +567,9 @@ class DistortionDSP
   ParamSmoother<SmootherType::logarithmic>  drive_factor_smoother { 1 };
   ParamSmoother<SmootherType::linear>       mix_smoother          { 1 };
 
-  ParamSmoother<SmootherType::logarithmic>  slew_time_smoother    { 1e-6 };
-  float                                     slew_p = 100;
+  constexpr static float                    slew_min_time         { 1 / (48000. * /* oversample */ 4) };
+  constexpr static float                    slew_max_time         { 0.200 };
+  ParamSmoother<SmootherType::logarithmic>  slew_time_smoother    { slew_min_time };
   float                                     slew_last_l = 0;
   float                                     slew_last_r = 0;
 
@@ -718,10 +719,10 @@ public:
   void
   set_slew (float slew, bool now)
   {
-    float min_time = 1 / (48000. * /* oversample */ 4);
-    float max_time = 0.200;
-    slew_time_smoother.set_target (min_time * powf (max_time / min_time, slew * 0.01f), now);
-    slew_p = slew;
+    /* slew = 100 (%)  -> slew_time = slew_min_time
+     * slew = 0   (%)  -> slew_time = slew_max_time
+     */
+    slew_time_smoother.set_target (slew_max_time * powf (slew_min_time / slew_max_time, slew * 0.01f), now);
   }
   void
   enable_filters (bool enable)
