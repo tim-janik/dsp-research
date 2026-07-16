@@ -567,7 +567,7 @@ class DistortionDSP
   ParamSmoother<SmootherType::logarithmic>  drive_factor_smoother { 1 };
   ParamSmoother<SmootherType::linear>       mix_smoother          { 1 };
 
-  float                                     slew_time = 1e-6;
+  ParamSmoother<SmootherType::logarithmic>  slew_time_smoother    { 1e-6 };
   float                                     slew_p = 100;
   float                                     slew_last_l = 0;
   float                                     slew_last_r = 0;
@@ -716,11 +716,11 @@ public:
     mix_smoother.set_target (std::clamp (percent * 0.01, 0.0, 1.0), now);
   }
   void
-  set_slew (float slew)
+  set_slew (float slew, bool now)
   {
     float min_time = 1 / (48000. * /* oversample */ 4);
     float max_time = 0.200;
-    slew_time = min_time * powf (max_time / min_time, slew * 0.01f);
+    slew_time_smoother.set_target (min_time * powf (max_time / min_time, slew * 0.01f), now);
     slew_p = slew;
   }
   void
@@ -909,8 +909,96 @@ public:
     if (mode == 16)
       process_with_tables (adaa_tables.soft_clip5_tables);
 
-    float slew_delta = 2.0 / (slew_time * sample_rate * oversample);
-    for (uint i = 0; i < n_samples * oversample; i++)
+    for (uint i = 0; i < n_samples * oversample; i += oversample)
+      {
+        process_slew_limiter (left + i, right + i, oversample, slew_time_smoother.get_next());
+      }
+
+    std::copy_n (left_over_delay_history.begin(), over_delay, left_over_raw);
+    std::copy_n (right_over_delay_history.begin(), over_delay, right_over_raw);
+    std::copy_n (&left[n_samples * oversample - over_delay], over_delay, left_over_delay_history.begin());
+    std::copy_n (&right[n_samples * oversample - over_delay], over_delay, right_over_delay_history.begin());
+
+    down_left->process_block (left_over_raw, oversample * n_samples, left_in);
+    down_right->process_block (right_over_raw, oversample * n_samples, right_in);
+
+    if (filters_enabled)
+      {
+        constexpr double BUTTERWORTH_Q = M_SQRT1_2; /* 1 / sqrt (2) */
+        constexpr float  BUTTERWORTH_Q_INV = 1 / BUTTERWORTH_Q;
+
+        float Q_inv_lp_hp[n_samples];
+        if (!post_lp_freq_smoother.is_constant() || !post_hp_freq_smoother.is_constant())
+          {
+            std::fill_n (Q_inv_lp_hp, n_samples, BUTTERWORTH_Q_INV);
+          }
+
+        if (post_lp_freq_smoother.is_constant())
+          {
+            /* FAST: no smoothing case */
+            post_lp_filter.set_params (SVF::LP, post_lp_freq_smoother.get_next(), BUTTERWORTH_Q_INV, 0);
+            post_lp_filter.process_block (SVF::LP, left_in, right_in, n_samples);
+          }
+        else
+          {
+            /* SLOW: with lowpass frequency smoothing */
+            float freq_lp[n_samples];
+
+            post_lp_freq_smoother.process_block (freq_lp, n_samples);
+            post_lp_filter.process_mod (SVF::LP, left_in, right_in, freq_lp, Q_inv_lp_hp, nullptr, n_samples);
+          }
+
+        if (post_hp_freq_smoother.is_constant())
+          {
+            /* FAST: no smoothing case */
+            post_hp_filter.set_params (SVF::HP, post_hp_freq_smoother.get_next(), BUTTERWORTH_Q_INV, 0);
+            post_hp_filter.process_block (SVF::HP, left_in, right_in, n_samples);
+          }
+        else
+          {
+            /* SLOW: with highpass frequency smoothing */
+            float freq_hp[n_samples];
+
+            post_hp_freq_smoother.process_block (freq_hp, n_samples);
+            post_hp_filter.process_mod (SVF::HP, left_in, right_in, freq_hp, Q_inv_lp_hp, nullptr, n_samples);
+          }
+      }
+    if (mode == 12)
+      {
+        for (uint i = 0; i < n_samples; i++)
+          {
+            left_in[i] = west_coast_lpf_left.process (left_in[i]);
+            right_in[i] = west_coast_lpf_right.process (right_in[i]);
+          }
+      }
+
+    if (mix_smoother.is_constant())
+      {
+        float mix = mix_smoother.get_next();
+
+        for (uint i = 0; i < n_samples; i++)
+          {
+            left_in[i] = dry_delay_left[i] + mix * (left_in[i] - dry_delay_left[i]);
+            right_in[i] = dry_delay_right[i] + mix * (right_in[i] - dry_delay_right[i]);
+          }
+      }
+    else
+      {
+        for (uint i = 0; i < n_samples; i++)
+          {
+            float mix = mix_smoother.get_next();
+
+            left_in[i] = dry_delay_left[i] + mix * (left_in[i] - dry_delay_left[i]);
+            right_in[i] = dry_delay_right[i] + mix * (right_in[i] - dry_delay_right[i]);
+          }
+      }
+  }
+
+  void
+  process_slew_limiter (float *left, float *right, uint n_samples, float current_slew_time)
+  {
+    float slew_delta = 2.0 / (current_slew_time * sample_rate * oversample);
+    for (uint i = 0; i < n_samples; i++)
       {
         if (mode == 5 || mode == 9 || mode == 11 || mode == 12 || mode == 13 || mode == 14 || mode == 15 || mode == 16)
           {
@@ -1022,85 +1110,6 @@ public:
 
             slew_last_l = left[i];
             slew_last_r = right[i];
-          }
-      }
-
-    std::copy_n (left_over_delay_history.begin(), over_delay, left_over_raw);
-    std::copy_n (right_over_delay_history.begin(), over_delay, right_over_raw);
-    std::copy_n (&left[n_samples * oversample - over_delay], over_delay, left_over_delay_history.begin());
-    std::copy_n (&right[n_samples * oversample - over_delay], over_delay, right_over_delay_history.begin());
-
-    down_left->process_block (left_over_raw, oversample * n_samples, left_in);
-    down_right->process_block (right_over_raw, oversample * n_samples, right_in);
-
-    if (filters_enabled)
-      {
-        constexpr double BUTTERWORTH_Q = M_SQRT1_2; /* 1 / sqrt (2) */
-        constexpr float  BUTTERWORTH_Q_INV = 1 / BUTTERWORTH_Q;
-
-        float Q_inv_lp_hp[n_samples];
-        if (!post_lp_freq_smoother.is_constant() || !post_hp_freq_smoother.is_constant())
-          {
-            std::fill_n (Q_inv_lp_hp, n_samples, BUTTERWORTH_Q_INV);
-          }
-
-        if (post_lp_freq_smoother.is_constant())
-          {
-            /* FAST: no smoothing case */
-            post_lp_filter.set_params (SVF::LP, post_lp_freq_smoother.get_next(), BUTTERWORTH_Q_INV, 0);
-            post_lp_filter.process_block (SVF::LP, left_in, right_in, n_samples);
-          }
-        else
-          {
-            /* SLOW: with lowpass frequency smoothing */
-            float freq_lp[n_samples];
-
-            post_lp_freq_smoother.process_block (freq_lp, n_samples);
-            post_lp_filter.process_mod (SVF::LP, left_in, right_in, freq_lp, Q_inv_lp_hp, nullptr, n_samples);
-          }
-
-        if (post_hp_freq_smoother.is_constant())
-          {
-            /* FAST: no smoothing case */
-            post_hp_filter.set_params (SVF::HP, post_hp_freq_smoother.get_next(), BUTTERWORTH_Q_INV, 0);
-            post_hp_filter.process_block (SVF::HP, left_in, right_in, n_samples);
-          }
-        else
-          {
-            /* SLOW: with highpass frequency smoothing */
-            float freq_hp[n_samples];
-
-            post_hp_freq_smoother.process_block (freq_hp, n_samples);
-            post_hp_filter.process_mod (SVF::HP, left_in, right_in, freq_hp, Q_inv_lp_hp, nullptr, n_samples);
-          }
-      }
-    if (mode == 12)
-      {
-        for (uint i = 0; i < n_samples; i++)
-          {
-            left_in[i] = west_coast_lpf_left.process (left_in[i]);
-            right_in[i] = west_coast_lpf_right.process (right_in[i]);
-          }
-      }
-
-    if (mix_smoother.is_constant())
-      {
-        float mix = mix_smoother.get_next();
-
-        for (uint i = 0; i < n_samples; i++)
-          {
-            left_in[i] = dry_delay_left[i] + mix * (left_in[i] - dry_delay_left[i]);
-            right_in[i] = dry_delay_right[i] + mix * (right_in[i] - dry_delay_right[i]);
-          }
-      }
-    else
-      {
-        for (uint i = 0; i < n_samples; i++)
-          {
-            float mix = mix_smoother.get_next();
-
-            left_in[i] = dry_delay_left[i] + mix * (left_in[i] - dry_delay_left[i]);
-            right_in[i] = dry_delay_right[i] + mix * (right_in[i] - dry_delay_right[i]);
           }
       }
   }
