@@ -909,9 +909,16 @@ public:
     if (mode == 16)
       process_with_tables (adaa_tables.soft_clip5_tables);
 
-    for (uint i = 0; i < n_samples * oversample; i += oversample)
+    if (slew_time_smoother.is_constant())
       {
-        process_slew_limiter (left + i, right + i, oversample, slew_time_smoother.get_next());
+        process_slew_limiter (left, right, n_samples * oversample, slew_time_smoother.get_next());
+      }
+    else
+      {
+        for (uint i = 0; i < n_samples * oversample; i += oversample)
+          {
+            process_slew_limiter (left + i, right + i, oversample, slew_time_smoother.get_next());
+          }
       }
 
     std::copy_n (left_over_delay_history.begin(), over_delay, left_over_raw);
