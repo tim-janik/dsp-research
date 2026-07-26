@@ -124,9 +124,10 @@ public:
         frac = fbin - ibin;
       }
 
-    float dx = frac * 2.f * RANGE / BINS;
+    float dx = 2.0 * RANGE / BINS;
 
-    float y = F_[ibin] + dx * f_[ibin] + 0.5f * dx * dx * (f_[ibin+1] - f_[ibin]) / (2.f * RANGE / BINS);;
+    float y = F_[ibin] + dx * frac * (f_[ibin] + 0.5f * frac * (f_[ibin+1] - f_[ibin]));
+
     if constexpr (PERIODIC)
       y += wrap.periods * period_integral_;
     return y;
