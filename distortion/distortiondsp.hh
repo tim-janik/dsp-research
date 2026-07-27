@@ -532,6 +532,7 @@ class DistortionDSP
   int oversample = -1;
   int mode = 0;
   int   last_table = -1;
+  int   last_mode = -1;
   float last_left = 0;
   float last_right = 0;
   float last_left_F_1 = 0;
@@ -634,6 +635,7 @@ public:
     west_coast_lpf_right.reset (sample_rate, 1333);
 
     last_table = -1;
+    last_mode = -1;
   }
   void
   set_pre_eq_params (float freq, float gain, float Q, bool now)
@@ -1064,13 +1066,14 @@ public:
     auto& table_1 = *table_array[table_index];
     auto& table_2 = *table_array[table_index + 1];
 
-    if (last_table != table_index)
+    if (last_table != table_index || last_mode != mode)
       {
         last_left_F_1 = table_1.F (last_left);
         last_right_F_1 = table_1.F (last_right);
         last_left_F_2 = table_2.F (last_left);
         last_right_F_2 = table_2.F (last_right);
         last_table = table_index;
+        last_mode = mode;
       }
     for (int i = 0; i < n_samples; i++)
       {
