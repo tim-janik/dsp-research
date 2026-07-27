@@ -214,7 +214,7 @@ main (int argc, char **argv)
   else if (argc == 2 && !strcmp (argv[1], "perf"))
     {
       DistortionDSP distortion_dsp;
-      distortion_dsp.set_mode (2);
+      distortion_dsp.set_mode (0);
       distortion_dsp.set_oversample (4);
       distortion_dsp.set_drive (6, true);
       distortion_dsp.set_symmetry (0, true);

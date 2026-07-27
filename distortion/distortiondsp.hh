@@ -62,6 +62,34 @@ class SVF
     d = 1.f / (1 + Q_inv*g + g*g);
     g1 = Q_inv + g;
   }
+  void
+  set_peq_params_A (float cutoff, float Q_inv, float A)
+  {
+    g = cutoff_warp (cutoff);
+    set_params_g_Q_inv (Q_inv / A);
+
+    m_bp = A * Q_inv;
+  }
+  void
+  set_lsh_params_M (float cutoff, float Q_inv, float M)
+  {
+    float A = M * M;
+
+    m_lp = A * A;
+    m_bp = A * Q_inv;
+    g = cutoff_warp (cutoff) / M;
+    set_params_g_Q_inv (Q_inv);
+  }
+  void
+  set_hsh_params_M (float cutoff, float Q_inv, float M)
+  {
+    float A = M * M;
+
+    m_bp = A * Q_inv;
+    m_hp = A * A;
+    g = cutoff_warp (cutoff) * M;
+    set_params_g_Q_inv (Q_inv);
+  }
 public:
   enum Output {
     LP,
@@ -104,34 +132,6 @@ public:
       {
         assert (false);
       }
-  }
-  void
-  set_peq_params_A (float cutoff, float Q_inv, float A)
-  {
-    g = cutoff_warp (cutoff);
-    set_params_g_Q_inv (Q_inv / A);
-
-    m_bp = A * Q_inv;
-  }
-  void
-  set_lsh_params_M (float cutoff, float Q_inv, float M)
-  {
-    float A = M * M;
-
-    m_lp = A * A;
-    m_bp = A * Q_inv;
-    g = cutoff_warp (cutoff) / M;
-    set_params_g_Q_inv (Q_inv);
-  }
-  void
-  set_hsh_params_M (float cutoff, float Q_inv, float M)
-  {
-    float A = M * M;
-
-    m_bp = A * Q_inv;
-    m_hp = A * A;
-    g = cutoff_warp (cutoff) * M;
-    set_params_g_Q_inv (Q_inv);
   }
   template<Output output>
   void
