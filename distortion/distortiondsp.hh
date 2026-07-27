@@ -797,7 +797,7 @@ public:
     float *left = left_over;
     float *right = right_over;
 
-    if (mode == 0)
+#if 0
       {
         float symmetry[n_samples];
         symmetry_smoother.process_block (symmetry, n_samples);
@@ -866,14 +866,8 @@ public:
             right[i] = distort (right[i], symmetry[i / oversample] * 0.01f);
           }
       }
-    if (mode == 1)
-      {
-        for (uint i = 0; i < n_samples * oversample; i++)
-          {
-            left[i] = std::sin (left[i]);
-            right[i] = std::sin (right[i]);
-          }
-      }
+#endif
+
     auto process_with_tables = [&] (auto& tables)
       {
         if (symmetry_smoother.is_constant())
@@ -887,26 +881,30 @@ public:
           }
       };
 
-    if (mode == 2 || mode == 3 || mode == 4 || mode == 5)
-      process_with_tables (adaa_tables.tanh_tables);
+    switch (mode)
+      {
+        case 0: process_with_tables (adaa_tables.tanh_tables);
+                break;
 
-    if (mode == 6 || mode == 7 || mode == 8 || mode == 9 || mode == 10)
-      process_with_tables (adaa_tables.sin_tables);
+        case 1: process_with_tables (adaa_tables.sin_tables);
+                break;
 
-    if (mode == 11 || mode == 12)
-      process_with_tables (adaa_tables.west_coast_tables);
+        case 2:
+        case 3: process_with_tables (adaa_tables.west_coast_tables);
+                break;
 
-    if (mode == 13)
-      process_with_tables (adaa_tables.hard_clip_tables);
+        case 4: process_with_tables (adaa_tables.hard_clip_tables);
+                break;
 
-    if (mode == 14)
-      process_with_tables (adaa_tables.soft_clip3_tables);
+        case 5: process_with_tables (adaa_tables.soft_clip3_tables);
+                break;
 
-    if (mode == 15)
-      process_with_tables (adaa_tables.soft_clip4_tables);
+        case 6: process_with_tables (adaa_tables.soft_clip4_tables);
+                break;
 
-    if (mode == 16)
-      process_with_tables (adaa_tables.soft_clip5_tables);
+        case 7: process_with_tables (adaa_tables.soft_clip5_tables);
+                break;
+      }
 
     if (slew_time_smoother.is_constant())
       {
@@ -969,7 +967,7 @@ public:
             post_hp_filter.process_mod (SVF::HP, left_in, right_in, freq_hp, Q_inv_lp_hp, nullptr, n_samples);
           }
       }
-    if (mode == 12)
+    if (mode == 3)
       {
         for (uint i = 0; i < n_samples; i++)
           {
@@ -1014,7 +1012,7 @@ public:
          * the input trajectory and the slew-limited output within the current sample
          * interval, before resampling at the original sample rate.
          */
-        auto process_slew = [slew_delta] (float& input_sample, SlewLimiterState& state)
+        auto process_slew = [slew_delta] (float input_sample, SlewLimiterState& state)
           {
             float y = state.slew_last;
             float slew_delta_signed = state.prev_target > state.slew_last ? slew_delta : -slew_delta;

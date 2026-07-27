@@ -18,17 +18,8 @@ public:
       addParameter (symmetry = new AudioParameterFloat ({ "symmetry", 1 }, "Symmetry", -100.0f, 100.0f, 0.0f));
       addParameter (mode = new AudioParameterChoice ({ "mode", 1 }, "Distortion Mode",
         {
-          "cheaptanh+adaa",
+          "tanh",
           "sin",
-          "tanh+asym+adaa+clamp2",
-          "tanh+asym+adaa+os3",
-          "tanh+asym+adaa+slavg4",
-          "tanh+asym+adaa+slli5",
-          "sin+adaa+clamp6",
-          "sin+adaa+os7",
-          "sin+adaa+avg8",
-          "sin+adaa+li9",
-          "sin+adaa",
           "west-coast+adaa",
           "west-coast+adaa+lpf",
           "hard-clip",
