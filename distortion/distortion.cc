@@ -500,6 +500,36 @@ main (int argc, char **argv)
       for (double x = -15; x < 15; x += 0.001)
         printf ("%f %.17g %.17g #d\n", x, (table.F (x + 0.001) - table.F (x))/0.001, sin (x) + 0.2);
     }
+  else if (argc == 2 && !strcmp (argv[1], "slew"))
+    {
+      int SR = 44100;
+      float buffer[5*SR], buffer2[5*SR];
+      double phase = 0;
+      double freq = 1000;
+      for (int i = 0; i < 5*SR; i++)
+        {
+          buffer[i] = buffer2[i] = sin (phase);
+          phase += freq * 2 * M_PI / 44100;
+        }
+      DistortionDSP distortion_dsp;
+      distortion_dsp.reset (SR);
+      distortion_dsp.set_mode (3);
+      distortion_dsp.set_oversample (4);
+      distortion_dsp.set_drive (20, true);
+      distortion_dsp.set_symmetry (0, true);
+      distortion_dsp.enable_filters (false);
+      distortion_dsp.set_mix (100, true);
+      distortion_dsp.set_slew (50, true);
+      int i = 0;
+      while (i < 5 * SR)
+        {
+          const int TODO = std::min (5 * SR - i, 1024);
+          distortion_dsp.process_block (&buffer[i], &buffer2[i], TODO);
+          i += TODO;
+        }
+      for (int i = 0; i < 5*SR; i++)
+        printf ("%.8f\n", buffer[i] * 0.25);
+    }
   else
     {
       int SR = 44100;
