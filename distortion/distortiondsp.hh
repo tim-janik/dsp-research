@@ -728,8 +728,9 @@ public:
   {
     filters_enabled = enable;
   }
+private:
   void
-  process_block (float *left_in, float *right_in, uint n_samples)
+  process_sub_block (float *left_in, float *right_in, uint n_samples)
   {
     if (!n_samples)
       {
@@ -1147,6 +1148,23 @@ public:
       {
         for (uint i = 0; i < n_samples; i++)
           apply_width (i, width_factor_smoother.get_next());
+      }
+  }
+  static constexpr uint MAX_BLOCK_SIZE = 1024;
+public:
+  void
+  process_block (float *left_in, float *right_in, uint n_samples)
+  {
+    /* split input into smaller blocks to avoid reaching stack size limit */
+    while (n_samples)
+      {
+        const uint todo = std::min (n_samples, MAX_BLOCK_SIZE);
+
+        process_sub_block (left_in, right_in, todo);
+
+        left_in += todo;
+        right_in += todo;
+        n_samples -= todo;
       }
   }
 };

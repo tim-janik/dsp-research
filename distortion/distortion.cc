@@ -296,13 +296,7 @@ main (int argc, char **argv)
       distortion_dsp.set_symmetry (0, true);
       distortion_dsp.set_pre_eq_params (1000, 12, 1, true);
       distortion_dsp.set_mix (mix, true);
-      int i = 0;
-      while (i < 5 * SR)
-        {
-          const int TODO = std::min (5 * SR - i, 1024);
-          distortion_dsp.process_block (&buffer[i], &buffer2[i], TODO);
-          i += TODO;
-        }
+      distortion_dsp.process_block (buffer, buffer2, 5*SR);
       for (int i = 0; i < 5*SR; i++)
         {
           printf ("%f %.8f\n", in_freq[i], sqrt (buffer[i] * buffer[i] + buffer2[i] * buffer2[i]));
@@ -517,13 +511,7 @@ main (int argc, char **argv)
       distortion_dsp.enable_filters (false);
       distortion_dsp.set_mix (100, true);
       distortion_dsp.set_slew (50, true);
-      int i = 0;
-      while (i < 5 * SR)
-        {
-          const int TODO = std::min (5 * SR - i, 1024);
-          distortion_dsp.process_block (&buffer[i], &buffer2[i], TODO);
-          i += TODO;
-        }
+      distortion_dsp.process_block (buffer, buffer2, 5*SR);
       for (int i = 0; i < 5*SR; i++)
         printf ("%.8f\n", buffer[i] * 0.25);
     }
@@ -540,19 +528,13 @@ main (int argc, char **argv)
           phase += freq * 2 * M_PI / 44100;
         }
       distortion_dsp.reset (SR);
-      distortion_dsp.set_mode (2);
+      distortion_dsp.set_mode (0);
       distortion_dsp.set_oversample (4);
       distortion_dsp.set_drive (36, true);
       distortion_dsp.set_symmetry (100, true);
       distortion_dsp.enable_filters (false);
       distortion_dsp.set_mix (100, true);
-      int i = 0;
-      while (i < 5 * SR)
-        {
-          const int TODO = std::min (5 * SR - i, 1024);
-          distortion_dsp.process_block (&buffer[i], &buffer2[i], TODO);
-          i += TODO;
-        }
+      distortion_dsp.process_block (buffer, buffer2, 5*SR);
       for (int i = 0; i < 5*SR; i++)
         printf ("%.8f\n", buffer[i] * 0.25);
     }
