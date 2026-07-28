@@ -28,9 +28,7 @@ public:
           "soft-clip5"
         }, 0));
       addParameter (oversample_param = new AudioParameterChoice ({ "oversample", 1 }, "Oversample", { "1x", "2x", "4x", "8x" }, 0));
-      addParameter (width = new AudioParameterFloat ({ "width", 100 }, "Width", 0.f, 150.f, 100.0f));
       addParameter (slew = new AudioParameterFloat ({ "slew", 1 }, "Slew", 0.0f, 100.0f, 100.0f));
-      addParameter (mix = new AudioParameterFloat ({ "mix", 1 }, "Mix", 0.0f, 100.0f, 100.0f));
 
       auto freq_range = NormalisableRange<float>(
         20.0f,
@@ -86,6 +84,10 @@ public:
       addParameter (pre_eq_Q = new AudioParameterFloat ({"pre_eq_Q", 1 }, "EQ Q", Q_range, 1.f));
       addParameter (post_hp_freq = new AudioParameterFloat ({"post_hp_freq", 1 }, "Post HP Freq", hp_freq_range, 80.f));
       addParameter (post_lp_freq = new AudioParameterFloat ({"post_lp_freq", 1 }, "Post LP Freq", lp_freq_range, 8000.f));
+
+      addParameter (width = new AudioParameterFloat ({ "width", 1 }, "Width", 0.f, 150.f, 100.0f));
+      addParameter (wet_gain = new AudioParameterFloat ({ "wet_gain", 1 }, "Wet Gain", -24.0f, 24.0f, 0.0f));
+      addParameter (mix = new AudioParameterFloat ({ "mix", 1 }, "Mix", 0.0f, 100.0f, 100.0f));
     }
 
     //==============================================================================
@@ -117,6 +119,7 @@ public:
      distortion_dsp.set_post_lp (post_lp_freq->get(), now);
      distortion_dsp.set_post_hp (post_hp_freq->get(), now);
      distortion_dsp.set_width (width->get(), now);
+     distortion_dsp.set_wet_gain (wet_gain->get(), now);
      distortion_dsp.set_mix (mix->get(), now);
    }
 
@@ -181,6 +184,7 @@ private:
     AudioParameterFloat* symmetry;
     AudioParameterFloat* mix;
     AudioParameterFloat* width;
+    AudioParameterFloat* wet_gain;
     AudioParameterFloat* slew;
     AudioParameterFloat* pre_eq_freq;
     AudioParameterFloat* pre_eq_gain;

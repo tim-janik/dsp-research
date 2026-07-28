@@ -566,6 +566,7 @@ class DistortionDSP
 
   ParamSmoother<SmootherType::linear>       symmetry_smoother     { 0 };
   ParamSmoother<SmootherType::logarithmic>  drive_factor_smoother { 1 };
+  ParamSmoother<SmootherType::logarithmic>  wet_factor_smoother   { 1 };
   ParamSmoother<SmootherType::linear>       mix_smoother          { 1 };
   ParamSmoother<SmootherType::linear>       width_factor_smoother { 1 };
 
@@ -701,6 +702,11 @@ public:
   set_drive (float drive, bool now)
   {
     drive_factor_smoother.set_target (exp10f (drive * (1/20.f)), now);
+  }
+  void
+  set_wet_gain (float wet_gain_db, bool now)
+  {
+    wet_factor_smoother.set_target (exp10f (wet_gain_db * (1/20.f)), now);
   }
   void
   set_symmetry (float new_symmetry, bool now)
@@ -986,14 +992,15 @@ public:
 
     process_width (left_in, right_in, n_samples);
 
-    if (mix_smoother.is_constant())
+    if (mix_smoother.is_constant() && wet_factor_smoother.is_constant())
       {
         float mix = mix_smoother.get_next();
+        float wet_factor = wet_factor_smoother.get_next();
 
         for (uint i = 0; i < n_samples; i++)
           {
-            left_in[i] = dry_delay_left[i] + mix * (left_in[i] - dry_delay_left[i]);
-            right_in[i] = dry_delay_right[i] + mix * (right_in[i] - dry_delay_right[i]);
+            left_in[i] = dry_delay_left[i] + mix * (left_in[i] * wet_factor - dry_delay_left[i]);
+            right_in[i] = dry_delay_right[i] + mix * (right_in[i] * wet_factor - dry_delay_right[i]);
           }
       }
     else
@@ -1001,9 +1008,10 @@ public:
         for (uint i = 0; i < n_samples; i++)
           {
             float mix = mix_smoother.get_next();
+            float wet_factor = wet_factor_smoother.get_next();
 
-            left_in[i] = dry_delay_left[i] + mix * (left_in[i] - dry_delay_left[i]);
-            right_in[i] = dry_delay_right[i] + mix * (right_in[i] - dry_delay_right[i]);
+            left_in[i] = dry_delay_left[i] + mix * (left_in[i] * wet_factor - dry_delay_left[i]);
+            right_in[i] = dry_delay_right[i] + mix * (right_in[i] * wet_factor - dry_delay_right[i]);
           }
       }
   }
