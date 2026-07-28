@@ -567,6 +567,7 @@ class DistortionDSP
   ParamSmoother<SmootherType::linear>       symmetry_smoother     { 0 };
   ParamSmoother<SmootherType::logarithmic>  drive_factor_smoother { 1 };
   ParamSmoother<SmootherType::linear>       mix_smoother          { 1 };
+  ParamSmoother<SmootherType::linear>       width_factor_smoother { 1 };
 
   constexpr static float                    slew_min_time         { 1 / (48000. * /* oversample */ 4) };
   constexpr static float                    slew_max_time         { 0.200 };
@@ -715,6 +716,11 @@ public:
   set_mix (float percent, bool now)
   {
     mix_smoother.set_target (std::clamp (percent * 0.01, 0.0, 1.0), now);
+  }
+  void
+  set_width (float percent, bool now)
+  {
+    width_factor_smoother.set_target ((percent + 100.f) * 0.01f * 0.5f, now);
   }
   void
   set_slew (float slew, bool now)
@@ -978,6 +984,8 @@ public:
           }
       }
 
+    process_width (left_in, right_in, n_samples);
+
     if (mix_smoother.is_constant())
       {
         float mix = mix_smoother.get_next();
@@ -1119,6 +1127,37 @@ public:
         last_right = r;
         last_right_F_1 = right_F_1;
         last_right_F_2 = right_F_2;
+      }
+  }
+  void
+  process_width (float *left, float *right, uint n_samples)
+  {
+    auto apply_width = [&] (uint i, const float width_factor)
+      {
+        const float l = left[i];
+        const float r = right[i];
+        const float a = width_factor;    // factor for same channel
+        const float b = 1.f - a;         // factor for other channel
+        left[i] = a * l + b * r;
+        right[i] = b * l + a * r;
+      };
+
+    if (width_factor_smoother.is_constant())
+      {
+        const float width_factor = width_factor_smoother.get_next();
+
+        // if width factor is 1, width is 100% and no processing is needed
+        if (fabs (width_factor - 1) > 1e-6)
+          {
+            // compiler should auto-vectorize this loop
+            for (uint i = 0; i < n_samples; i++)
+              apply_width (i, width_factor);
+          }
+      }
+    else
+      {
+        for (uint i = 0; i < n_samples; i++)
+          apply_width (i, width_factor_smoother.get_next());
       }
   }
 };

@@ -28,7 +28,7 @@ public:
           "soft-clip5"
         }, 0));
       addParameter (oversample_param = new AudioParameterChoice ({ "oversample", 1 }, "Oversample", { "1x", "2x", "4x", "8x" }, 0));
-      addParameter (bias = new AudioParameterFloat ({ "bias", 1 }, "Bias", -0.5f, 0.5f, 0.0f));
+      addParameter (width = new AudioParameterFloat ({ "width", 100 }, "Width", 0.f, 150.f, 100.0f));
       addParameter (slew = new AudioParameterFloat ({ "slew", 1 }, "Slew", 0.0f, 100.0f, 100.0f));
       addParameter (mix = new AudioParameterFloat ({ "mix", 1 }, "Mix", 0.0f, 100.0f, 100.0f));
 
@@ -116,6 +116,7 @@ public:
      distortion_dsp.set_pre_eq_params (pre_eq_freq->get(), pre_eq_gain->get(), pre_eq_Q->get(), now);
      distortion_dsp.set_post_lp (post_lp_freq->get(), now);
      distortion_dsp.set_post_hp (post_hp_freq->get(), now);
+     distortion_dsp.set_width (width->get(), now);
      distortion_dsp.set_mix (mix->get(), now);
    }
 
@@ -179,7 +180,7 @@ private:
     AudioParameterFloat* drive;
     AudioParameterFloat* symmetry;
     AudioParameterFloat* mix;
-    AudioParameterFloat* bias;
+    AudioParameterFloat* width;
     AudioParameterFloat* slew;
     AudioParameterFloat* pre_eq_freq;
     AudioParameterFloat* pre_eq_gain;

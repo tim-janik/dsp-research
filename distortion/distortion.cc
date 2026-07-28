@@ -218,6 +218,7 @@ main (int argc, char **argv)
       distortion_dsp.set_oversample (4);
       distortion_dsp.set_drive (6, true);
       distortion_dsp.set_symmetry (0, true);
+      distortion_dsp.set_width (75, true);   // width=100% is optimized
       distortion_dsp.reset (48000);
 
       for (int p = 0; p < 3; p++)
@@ -243,12 +244,14 @@ main (int argc, char **argv)
                   const float Q[2] = { 1, 2 };
                   const float SYM[2] = { -50, 100 };
                   const float SLEW[2] = { 25, 66 };
+                  const float WIDTH[2] = { 25, 80 };
 
                   distortion_dsp.set_pre_eq_params (F[b & 1], G[b & 1], Q[b & 1], false);
                   distortion_dsp.set_post_lp (F[b & 1], false);
                   distortion_dsp.set_post_hp (F[b & 1], false);
                   distortion_dsp.set_symmetry (SYM[b & 1], false);
                   distortion_dsp.set_slew (SLEW[b & 1], false);
+                  distortion_dsp.set_width (WIDTH[b & 1], false);
                 }
               distortion_dsp.process_block (left, right, block_size);
             }
