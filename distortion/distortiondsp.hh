@@ -11,6 +11,10 @@ using PandaResampler::Resampler2;
 #include <cstddef>
 #include <cstdint>
 
+#pragma GCC push_options
+// -ftree-slp-vectorize generates slower code for process_s<>() with g++-13.3.0 -march=znver1 -mtune=znver1
+#pragma GCC optimize ("no-tree-slp-vectorize")
+
 /* SVF: The Art of VA Filter Desgin 2.1.2 by Vadim Zavalishin */
 class SVF
 {
@@ -204,13 +208,7 @@ public:
         i += todo;
       }
   }
-  template<Output output>
-  float process (float l)
-  {
-    float dummy = 0;
-    process_s<output> (&l, &dummy);
-    return l;
-  }
+private:
   template<Output output>
   void process_s (float *l, float *r) __restrict__
   {
@@ -286,6 +284,7 @@ public:
         assert (false);
       }
   }
+public:
   template<Output output>
   void
   process_block (float *left, float *right, uint n_samples)
@@ -344,6 +343,8 @@ public:
       }
   }
 };
+
+#pragma GCC pop_options
 
 class OnePoleLowPass
 {
