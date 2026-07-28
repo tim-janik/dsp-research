@@ -189,7 +189,7 @@ main (int argc, char **argv)
   if (argc == 2 && !strcmp (argv[1], "dbg"))
     {
       DistortionDSP distortion_dsp;
-      distortion_dsp.set_mode (5);
+      distortion_dsp.set_mode (0);
       distortion_dsp.set_oversample (1);
       distortion_dsp.set_drive (0, true);
       distortion_dsp.set_symmetry (0, true);
@@ -202,13 +202,7 @@ main (int argc, char **argv)
           float l = d, r = d;
           distortion_dsp.process_block (&l, &r, 1);
 
-          auto cheap_tanh = [] (float x)
-            {
-              x = std::clamp (x, -3.0f, 3.0f);
-              return (x * (27.0f + x * x) / (27.0f + 9.0f * x * x));
-            };
-
-          printf ("%.17g %.17g %.17g %.17g\n", d - eps * 0.5, l, r, cheap_tanh (d - eps * 0.5));
+          printf ("%.17g %.17g %.17g %.17g\n", d - eps * 0.5, l, r, tanh (d - eps * 0.5));
         }
     }
   else if (argc == 2 && !strcmp (argv[1], "perf"))
