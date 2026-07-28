@@ -448,9 +448,7 @@ class DistortionDSP
     std::array<std::unique_ptr<ADAATable<TableRangePi, 1024, true>>, N_TABLES> sin_tables;
     std::array<std::unique_ptr<ADAATable<TableRange15, 1024>>,       N_TABLES> west_coast_tables;
     std::array<std::unique_ptr<ADAATable<TableRange1, 512>>,         N_TABLES> hard_clip_tables;
-    std::array<std::unique_ptr<ADAATable<TableRange2, 512>>,         N_TABLES> soft_clip3_tables;
-    std::array<std::unique_ptr<ADAATable<TableRange2, 512>>,         N_TABLES> soft_clip4_tables;
-    std::array<std::unique_ptr<ADAATable<TableRange2, 512>>,         N_TABLES> soft_clip5_tables;
+    std::array<std::unique_ptr<ADAATable<TableRange2, 512>>,         N_TABLES> soft_clip_tables;
     ADAATables()
     {
       for (size_t i = 0; i < N_TABLES; i++)
@@ -495,21 +493,9 @@ class DistortionDSP
           hard_clip_tables[i] = std::make_unique<ADAATable<TableRange1, 512>> (
             [&] (double x) { return distort_asymmetric (std::clamp (x, -1.0, 1.0), symmetry); }
           );
-          soft_clip3_tables[i] = std::make_unique<ADAATable<TableRange2, 512>> (
+          soft_clip_tables[i] = std::make_unique<ADAATable<TableRange2, 512>> (
             [&] (double x) {
               double y = pow (std::tanh (pow (std::abs(x), 3)), 1.0 / 3) * sign (x);
-              return distort_asymmetric (y, symmetry);
-            }
-          );
-          soft_clip4_tables[i] = std::make_unique<ADAATable<TableRange2, 512>> (
-            [&] (double x) {
-              double y = pow (std::tanh (pow (std::abs(x), 4)), 1.0 / 4) * sign (x);
-              return distort_asymmetric (y, symmetry);
-            }
-          );
-          soft_clip5_tables[i] = std::make_unique<ADAATable<TableRange2, 512>> (
-            [&] (double x) {
-              double y = pow (std::tanh (pow (std::abs(x), 5)), 0.2) * sign (x);
               return distort_asymmetric (y, symmetry);
             }
           );
@@ -910,13 +896,7 @@ public:
         case 4: process_with_tables (adaa_tables.hard_clip_tables);
                 break;
 
-        case 5: process_with_tables (adaa_tables.soft_clip3_tables);
-                break;
-
-        case 6: process_with_tables (adaa_tables.soft_clip4_tables);
-                break;
-
-        case 7: process_with_tables (adaa_tables.soft_clip5_tables);
+        case 5: process_with_tables (adaa_tables.soft_clip_tables);
                 break;
       }
 

@@ -1,8 +1,1 @@
-- pre-eq
-- post-filters
-- smoothing
-- symmetry
-- slew
-- sin-folding distortion
-- hard clipper
 - -fno-tree-slp-vectorize should not be global

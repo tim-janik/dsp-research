@@ -23,9 +23,7 @@ public:
           "west-coast+adaa",
           "west-coast+adaa+lpf",
           "hard-clip",
-          "soft-clip3",
-          "soft-clip4",
-          "soft-clip5"
+          "soft-clip",
         }, 0));
       addParameter (oversample_param = new AudioParameterChoice ({ "oversample", 1 }, "Oversample", { "1x", "2x", "4x", "8x" }, 0));
       addParameter (slew = new AudioParameterFloat ({ "slew", 1 }, "Slew", 0.0f, 100.0f, 100.0f));
