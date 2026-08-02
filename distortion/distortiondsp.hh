@@ -443,6 +443,18 @@ private:
 
 class DistortionDSP
 {
+public:
+  enum class Mode
+  {
+    INVALID = -1,
+    TANH,
+    SOFT_CLIP,
+    HARD_CLIP,
+    SIN,
+    WEST_COAST,
+    WEST_COAST_LPF
+  };
+private:
   struct ADAATables
   {
     static constexpr int N_TABLES = 31; // odd to have the center table represent a linear function
@@ -523,9 +535,9 @@ class DistortionDSP
 
   static constexpr int MAX_OVERSAMPLE = 8;
   int oversample = -1;
-  int mode = 0;
+  Mode mode = Mode::TANH;
   int   last_table = -1;
-  int   last_mode = -1;
+  Mode  last_mode = Mode::INVALID;
   float last_left = 0;
   float last_right = 0;
   float last_left_F_1 = 0;
@@ -630,7 +642,7 @@ public:
     west_coast_lpf_right.reset (sample_rate, 1333);
 
     last_table = -1;
-    last_mode = -1;
+    last_mode = Mode::INVALID;
   }
   void
   set_pre_eq_params (float freq, float gain, float Q, bool now)
@@ -707,7 +719,7 @@ public:
     symmetry_smoother.set_target (new_symmetry, now);
   }
   void
-  set_mode (int new_mode)
+  set_mode (Mode new_mode)
   {
     mode = new_mode;
   }
@@ -896,21 +908,23 @@ private:
 
     switch (mode)
       {
-        case 0: process_with_tables (adaa_tables.tanh_tables);
-                break;
+        case Mode::TANH:            process_with_tables (adaa_tables.tanh_tables);
+                                    break;
 
-        case 1: process_with_tables (adaa_tables.sin_tables);
-                break;
+        case Mode::SOFT_CLIP:       process_with_tables (adaa_tables.soft_clip_tables);
+                                    break;
 
-        case 2:
-        case 3: process_with_tables (adaa_tables.west_coast_tables);
-                break;
+        case Mode::HARD_CLIP:       process_with_tables (adaa_tables.hard_clip_tables);
+                                    break;
 
-        case 4: process_with_tables (adaa_tables.hard_clip_tables);
-                break;
+        case Mode::SIN:             process_with_tables (adaa_tables.sin_tables);
+                                    break;
 
-        case 5: process_with_tables (adaa_tables.soft_clip_tables);
-                break;
+        case Mode::WEST_COAST:
+        case Mode::WEST_COAST_LPF:  process_with_tables (adaa_tables.west_coast_tables);
+                                    break;
+
+        default:                    assert (false);
       }
 
     if (slew_time_smoother.is_constant())
@@ -974,7 +988,7 @@ private:
             post_hp_filter.process_mod (SVF::HP, left_in, right_in, freq_hp, Q_inv_lp_hp, nullptr, n_samples);
           }
       }
-    if (mode == 3)
+    if (mode == Mode::WEST_COAST_LPF)
       {
         for (uint i = 0; i < n_samples; i++)
           {

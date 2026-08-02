@@ -189,7 +189,7 @@ main (int argc, char **argv)
   if (argc == 2 && !strcmp (argv[1], "dbg"))
     {
       DistortionDSP distortion_dsp;
-      distortion_dsp.set_mode (0);
+      distortion_dsp.set_mode (DistortionDSP::Mode::TANH);
       distortion_dsp.set_oversample (1);
       distortion_dsp.set_drive (0, true);
       distortion_dsp.set_symmetry (0, true);
@@ -208,7 +208,7 @@ main (int argc, char **argv)
   else if (argc == 2 && !strcmp (argv[1], "perf"))
     {
       DistortionDSP distortion_dsp;
-      distortion_dsp.set_mode (0);
+      distortion_dsp.set_mode (DistortionDSP::Mode::TANH);
       distortion_dsp.set_oversample (4);
       distortion_dsp.set_drive (6, true);
       distortion_dsp.set_symmetry (0, true);
@@ -261,7 +261,7 @@ main (int argc, char **argv)
     {
       DistortionDSP distortion_dsp;
       distortion_dsp.reset (44100);
-      distortion_dsp.set_mode (5);
+      distortion_dsp.set_mode (DistortionDSP::Mode::TANH);
       distortion_dsp.set_oversample (4);
       distortion_dsp.set_drive (-20, true);
       distortion_dsp.set_symmetry (0, true);
@@ -290,7 +290,7 @@ main (int argc, char **argv)
           phase += freq * 2 * M_PI / 44100;
         }
       distortion_dsp.reset (SR);
-      distortion_dsp.set_mode (0);
+      distortion_dsp.set_mode (DistortionDSP::Mode::TANH);
       distortion_dsp.set_oversample (4);
       distortion_dsp.set_drive (0, true);
       distortion_dsp.set_symmetry (0, true);
@@ -504,7 +504,7 @@ main (int argc, char **argv)
         }
       DistortionDSP distortion_dsp;
       distortion_dsp.reset (SR);
-      distortion_dsp.set_mode (3);
+      distortion_dsp.set_mode (DistortionDSP::Mode::TANH);
       distortion_dsp.set_oversample (4);
       distortion_dsp.set_drive (20, true);
       distortion_dsp.set_symmetry (0, true);
@@ -528,7 +528,7 @@ main (int argc, char **argv)
           phase += freq * 2 * M_PI / 44100;
         }
       distortion_dsp.reset (SR);
-      distortion_dsp.set_mode (0);
+      distortion_dsp.set_mode (DistortionDSP::Mode::TANH);
       distortion_dsp.set_oversample (4);
       distortion_dsp.set_drive (36, true);
       distortion_dsp.set_symmetry (100, true);
