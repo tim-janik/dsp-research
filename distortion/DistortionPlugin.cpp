@@ -109,6 +109,8 @@ public:
      if (oversample_param->getIndex() == 3)
        new_oversample = 8;
      distortion_dsp.set_oversample (new_oversample);
+     setLatencySamples (distortion_dsp.latency_samples()); // depends on oversample
+
      distortion_dsp.set_drive (drive->get(), now);
      distortion_dsp.set_symmetry (symmetry->get(), now);
      distortion_dsp.set_slew (slew->get(), now);

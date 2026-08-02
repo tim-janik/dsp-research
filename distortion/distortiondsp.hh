@@ -403,6 +403,12 @@ public:
     m_delay_samples = delay_samples;
   }
 
+  size_t
+  delay() const
+  {
+    return m_delay_samples;
+  }
+
   void
   reset()
   {
@@ -727,6 +733,11 @@ public:
   enable_filters (bool enable)
   {
     filters_enabled = enable;
+  }
+  uint
+  latency_samples() const
+  {
+    return dry_delay.delay();
   }
 private:
   void
