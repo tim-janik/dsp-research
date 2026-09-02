@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.15)
 project(DISTORTION_PLUGIN VERSION 0.0.1)
 
+set(CMAKE_CXX_FLAGS_RELWITHASSERT "${CMAKE_CXX_FLAGS_RELEASE} -UNDEBUG")
+
 # 1. Tell CMake where JUCE lives
 # Ensure this path points to the root JUCE folder (containing the 'modules' folder)
 add_subdirectory(/home/stefan/src/2nd-tree/JUCE _deps/juce)
