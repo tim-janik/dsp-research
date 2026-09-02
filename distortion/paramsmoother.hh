@@ -58,6 +58,9 @@ public:
         return;
       }
 
+    // user must initialize sample rate using reset() before using set (..., false)
+    assert (sample_rate_ > 0);
+
     float total_ramp_samples = ramp_time_sec_ * sample_rate_;
 
     if (total_ramp_samples > 0.0f)
@@ -125,8 +128,8 @@ public:
   }
 
 private:
-  double sample_rate_ = 44100.0;
-  float ramp_time_sec_ = 0.025f;
+  double sample_rate_ = 0.0;
+  float ramp_time_sec_ = 0.0;
 
   float target_ = 0.0f;
   float current_ = 0.0f;

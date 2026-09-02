@@ -632,6 +632,11 @@ public:
     post_hp_freq_smoother.reset (sample_rate, 0.025);
 
     symmetry_smoother.reset (sample_rate, 0.025);
+    drive_factor_smoother.reset (sample_rate, 0.025);
+    wet_factor_smoother.reset (sample_rate, 0.025);
+    mix_smoother.reset (sample_rate, 0.025);
+    width_factor_smoother.reset (sample_rate, 0.025);
+    slew_time_smoother.reset (sample_rate, 0.025);
 
     this->sample_rate = sample_rate;
     left_over_delay_history.fill (0);
