@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <cassert>
+#include <algorithm>
 
 enum class SmootherType {
   linear,
@@ -18,12 +19,12 @@ public:
   }
 
   /**
-   * Initializes the smoother with sample rate and ramp time constants.
+   * Initializes the ramp length in samples, with a minimum of one sample.
    */
   void reset (double sample_rate, float ramp_time_sec)
   {
-    sample_rate_ = sample_rate;
-    ramp_time_sec_ = ramp_time_sec;
+    assert (sample_rate > 0);
+    ramp_samples_ = static_cast<unsigned int> (std::max (ramp_time_sec * sample_rate, 1.0));
   }
 
   /**
@@ -57,29 +58,18 @@ public:
         return;
       }
 
-    // user must initialize sample rate using reset() before using set (..., false)
-    assert (sample_rate_ > 0);
+    // user must initialize ramp length using reset() before using set_target (..., false)
+    assert (ramp_samples_ > 0);
+    ramp_counter_ = ramp_samples_;
 
-    float total_ramp_samples = ramp_time_sec_ * sample_rate_;
-
-    if (total_ramp_samples > 0.0f)
+    if constexpr (smoother_type == SmootherType::linear)
       {
-        ramp_counter_ = static_cast<unsigned int>(total_ramp_samples);
-
-        if constexpr (smoother_type == SmootherType::linear)
-          {
-            step_or_factor_ = (target_ - current_) / total_ramp_samples;
-          }
-        else
-          {
-            assert (current_ > 0.0f);
-            step_or_factor_ = std::pow (target_ / current_, 1.0f / total_ramp_samples);
-          }
+        step_or_factor_ = (target_ - current_) / ramp_samples_;
       }
     else
       {
-        current_ = target_;
-        ramp_counter_ = 0;
+        assert (current_ > 0.0f);
+        step_or_factor_ = std::pow (target_ / current_, 1.0f / ramp_samples_);
       }
   }
 
@@ -127,8 +117,7 @@ public:
   }
 
 private:
-  double sample_rate_ = 0.0;
-  float ramp_time_sec_ = 0.0;
+  unsigned int ramp_samples_ = 0;
 
   float target_ = 0.0f;
   float current_ = 0.0f;
