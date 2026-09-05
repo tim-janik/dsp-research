@@ -1,7 +1,7 @@
 #pragma once
 
 #include <cmath>
-#include <algorithm>
+#include <cassert>
 
 enum class SmootherType {
   linear,
@@ -31,9 +31,8 @@ public:
    */
   void set_target (float target, bool now = false)
   {
-    // safety clipping for log curves
     if constexpr (smoother_type == SmootherType::logarithmic)
-      target = std::max(target, 0.00001f);
+      assert (target > 0.0f);
 
     if (target == target_ && !now)
       return;
@@ -73,8 +72,8 @@ public:
           }
         else
           {
-            float sanitized_current = std::max (current_, 0.00001f);
-            step_or_factor_ = std::pow (target_ / sanitized_current, 1.0f / total_ramp_samples);
+            assert (current_ > 0.0f);
+            step_or_factor_ = std::pow (target_ / current_, 1.0f / total_ramp_samples);
           }
       }
     else
